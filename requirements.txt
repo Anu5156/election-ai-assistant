@@ -1,0 +1,10 @@
+streamlit
+google-generativeai
+openai
+firebase-admin
+requests
+streamlit-folium
+folium
+gtts
+polyline
+python-dotenv
