@@ -8,40 +8,33 @@ from firebase_admin import credentials, firestore
 from datetime import timezone
 
 
-
 # ================================
 # 🔐 FIREBASE INIT (LOCAL + CLOUD)
 # ================================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 KEY_PATH = os.path.join(BASE_DIR, "firebase_key.json")
 
-if not firebase_admin._apps:
-    if os.path.exists(KEY_PATH):
-        # Local development — use the JSON file
-        cred = credentials.Certificate(KEY_PATH)
-    else:
-        # Streamlit Cloud — write secrets to a temp file
-        import tempfile
-        key_dict = {
-            "type": st.secrets["firebase"]["type"],
-            "project_id": st.secrets["firebase"]["project_id"],
-            "private_key_id": st.secrets["firebase"]["private_key_id"],
-            "private_key": st.secrets["firebase"]["private_key"],
-            "client_email": st.secrets["firebase"]["client_email"],
-            "client_id": st.secrets["firebase"]["client_id"],
-            "auth_uri": st.secrets["firebase"]["auth_uri"],
-            "token_uri": st.secrets["firebase"]["token_uri"],
-            "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"],
-        }
-        # Write to temp file
-        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-        json.dump(key_dict, tmp)
-        tmp.close()
-        cred = credentials.Certificate(tmp.name)
-    firebase_admin.initialize_app(cred)
+db = None  # Default to None
 
-db = firestore.client()
+try:
+    if not firebase_admin._apps:
+        if os.path.exists(KEY_PATH):
+            cred = credentials.Certificate(KEY_PATH)
+        elif "firebase" in st.secrets:
+            import tempfile
+            key_dict = dict(st.secrets["firebase"])
+            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+            json.dump(key_dict, tmp)
+            tmp.close()
+            cred = credentials.Certificate(tmp.name)
+        else:
+            raise FileNotFoundError("No Firebase credentials found")
+        firebase_admin.initialize_app(cred)
+    db = firestore.client()
+    print("✅ Firebase connected successfully")
+except Exception as e:
+    print(f"⚠️ Firebase unavailable ({e}). Using mock data.")
+    db = None
 
 
 # ================================
@@ -51,7 +44,8 @@ def submit_vote(candidate, location="unknown"):
     """
     Stores vote in Firestore with extra metadata
     """
-
+    if db is None:
+        return
     try:
         db.collection("votes").add({
             "candidate": candidate,
@@ -69,7 +63,8 @@ def get_vote_counts():
     """
     Returns total votes per candidate
     """
-
+    if db is None:
+        return {}
     counts = {}
 
     try:
@@ -94,7 +89,8 @@ def get_crowd_data():
     """
     Returns number of voters per location
     """
-
+    if db is None:
+        return {}
     crowd = {}
 
     try:
@@ -119,7 +115,8 @@ def get_detailed_votes():
     """
     Returns full vote records (for dashboards / ML)
     """
-
+    if db is None:
+        return []
     records = []
 
     try:
@@ -134,6 +131,8 @@ def get_detailed_votes():
     return records
 
 def submit_verification(voter_qr, is_authentic):
+    if db is None:
+        return
     db.collection("verification_logs").add({
         "voter_qr": voter_qr,
         "is_authentic": is_authentic,
@@ -141,7 +140,8 @@ def submit_verification(voter_qr, is_authentic):
     })
 
 def get_live_queue():
-
+    if db is None:
+        return {}
     docs = db.collection("votes").stream()
     now = datetime.utcnow()
 
@@ -158,8 +158,9 @@ def get_live_queue():
     return queue
 
 def get_booth_crowd():
+    if db is None:
+        return {}
     from datetime import datetime, timezone
-
     docs = db.collection("votes").stream()
     now = datetime.now(timezone.utc)
 
@@ -181,6 +182,8 @@ def get_booth_crowd():
     return crowd
 
 def get_live_analytics():
+    if db is None:
+        return {}
     docs = db.collection("votes").stream()
 
     counts = {}
