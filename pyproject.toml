@@ -1,0 +1,30 @@
+[project]
+name = "election-ai-assistant"
+version = "1.0.0"
+description = "A professional, AI-powered civic engagement platform for voters in India."
+authors = [{ name = "CivicGuide AI Team" }]
+dependencies = [
+    "streamlit",
+    "google-genai",
+    "googlemaps",
+    "firebase-admin",
+    "python-dotenv",
+    "plotly",
+    "pandas",
+    "folium",
+    "streamlit-folium",
+    "streamlit-js-eval",
+    "gTTS"
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+
+[tool.black]
+line-length = 100
+target-version = ['py39']
+
+[tool.isort]
+profile = "black"
+line_length = 100

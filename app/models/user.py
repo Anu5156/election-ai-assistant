@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
+from app.utils.validators import sanitize_input
 
 
 class User(BaseModel):
@@ -22,6 +23,14 @@ class User(BaseModel):
     preferred_language: Optional[str] = Field("en", description="ISO language code for translations")
     stage: Optional[str] = Field("start", description="Current stage in the voting journey")
     preference: Optional[str] = Field("low", description="User preference for crowd density (low, any)")
+
+    # -------- VALIDATORS (SECURITY LAYER) --------
+    @field_validator("location", "voting_location")
+    @classmethod
+    def sanitize_strings(cls, v: Optional[str]) -> Optional[str]:
+        if v and not sanitize_input(v):
+            raise ValueError("Input contains potentially malicious patterns.")
+        return v
 
     # -------- BUSINESS LOGIC --------
     def is_eligible(self) -> bool:

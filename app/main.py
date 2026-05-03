@@ -105,6 +105,9 @@ st.set_page_config(
 
 # 🌍 ACCESSIBILITY & SEO METADATA
 st.markdown("""
+    <script>
+        document.documentElement.lang = 'en';
+    </script>
     <head>
         <meta name="description" content="CivicGuide AI: A multilingual, AI-powered election assistant helping citizens find polling booths, track crowd density, and cast informed votes.">
         <meta name="keywords" content="election, voting, india, polling station, civic guide, voter assistance">
@@ -114,6 +117,9 @@ st.markdown("""
     <a href="#main-content" class="skip-link" style="position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;">
         Skip to main content
     </a>
+    <div id="sr-announcer" role="status" aria-live="polite" style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;">
+        Application Loaded.
+    </div>
 """, unsafe_allow_html=True)
 
 # ─────────────────────────────────────────
