@@ -193,5 +193,3 @@ def get_live_analytics():
         counts[candidate] = counts.get(candidate, 0) + 1
 
     return get_vote_counts()
-
-    

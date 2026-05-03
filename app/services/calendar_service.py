@@ -1,33 +1,38 @@
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
+from typing import Optional
 
-
-def generate_calendar_link(location, date="20260510", title="Vote in Election", description=None):
+def generate_calendar_link(
+    location: str, 
+    date: str = "20260510", 
+    title: str = "Vote in Election", 
+    description: Optional[str] = None
+) -> Optional[str]:
     """
-    Generates a Google Calendar event link for voting reminder
-
+    Generates a high-fidelity Google Calendar event link for a voting reminder.
+    
     Args:
-        location (str): User location
-        date (str): Date in YYYYMMDD format
-        title (str): Event title
-        description (str): Event description
-
+        location: Human-readable location or booth name.
+        date: Date in YYYYMMDD format.
+        title: Title of the calendar event.
+        description: Detailed description of the event.
+        
     Returns:
-        str: Google Calendar event URL
+        A Google Calendar TEMPLATE URL or None if an error occurs.
     """
 
     try:
-        # ⏰ Default timings (7 AM to 6 PM voting window)
+        # ⏰ Default timings (7 AM to 6 PM IST voting window)
         start_date = f"{date}T070000"
         end_date = f"{date}T180000"
 
-        # 📌 Default description
+        # 📌 Default description if none provided
         if not description:
-            description = "Remember to vote and participate in democracy!"
+            description = "Your voice matters! Head to your assigned polling station and cast your vote for a stronger democracy."
 
         place = f"Polling Station - {location}"
 
-        # 🔥 URL ENCODING (IMPORTANT)
+        # 🔥 URL ENCODING (Strict compliance with RFC 3986)
         title_encoded = urllib.parse.quote(title)
         details_encoded = urllib.parse.quote(description)
         location_encoded = urllib.parse.quote(place)
@@ -44,15 +49,24 @@ def generate_calendar_link(location, date="20260510", title="Vote in Election", 
         return calendar_url
 
     except Exception as e:
-        print("CALENDAR ERROR:", e)
+        print(f"CALENDAR GENERATION ERROR: {e}")
         return None
 
 
-def generate_ics(location, date, time):
-    from datetime import datetime, timedelta
-
+def generate_ics(location: str, date: str, time: str) -> Optional[str]:
+    """
+    Generates a standard iCalendar (.ics) format string for offline calendar integration.
+    
+    Args:
+        location: The physical location of the booth.
+        date: Date in ISO format (YYYY-MM-DD).
+        time: Time in HH:MM format.
+        
+    Returns:
+        A valid VCALENDAR string or None on failure.
+    """
     try:
-        # normalize time
+        # Normalize time to include seconds
         if len(time.split(":")) == 2:
             time += ":00"
 
@@ -63,18 +77,25 @@ def generate_ics(location, date, time):
         end = dt_end.strftime("%Y%m%dT%H%M%S")
 
         ics_content = f"""BEGIN:VCALENDAR
-                    VERSION:2.0
-                    BEGIN:VEVENT
-                    SUMMARY:Election Reminder
-                    DTSTART:{start}
-                    DTEND:{end}
-                    LOCATION:{location}
-                    DESCRIPTION:Go vote at {location}
-                    END:VEVENT
-                    END:VCALENDAR
-                    """
+VERSION:2.0
+PRODID:-//CivicGuide AI//NONSGML Election Reminder//EN
+BEGIN:VEVENT
+SUMMARY:🗳️ Election Day Reminder
+DTSTART:{start}
+DTEND:{end}
+LOCATION:{location}
+DESCRIPTION:Time to vote! Ensure you carry your EPIC card and visit your polling station at {location}.
+STATUS:CONFIRMED
+SEQUENCE:0
+BEGIN:VALARM
+TRIGGER:-PT1H
+ACTION:DISPLAY
+DESCRIPTION:Election Reminder
+END:VALARM
+END:VEVENT
+END:VCALENDAR"""
 
         return ics_content  
     except Exception as e:
-        print("ICS ERROR:", e)
+        print(f"ICS GENERATION ERROR: {e}")
         return None

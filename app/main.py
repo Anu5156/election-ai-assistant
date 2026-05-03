@@ -1,3 +1,14 @@
+"""
+CivicGuide AI - The Ultimate AI-Powered Election Assistant
+Main Orchestration Module
+
+This application provides citizens with localized, real-time election information including:
+- Polling booth discovery and routing (Google Maps API)
+- Real-time crowd density tracking (Firebase Firestore)
+- Personalized voting strategies (Google Gemini AI)
+- Multi-language support (12 Indian languages)
+- Digital Voting Pass and calendar reminders
+"""
 import streamlit as st
 import sys
 import os
@@ -86,11 +97,24 @@ def load_stations(location):
 # PAGE CONFIG  (must be first st call)
 # ─────────────────────────────────────────
 st.set_page_config(
-    page_title="CivicGuide AI",
+    page_title="CivicGuide AI - Your Smart Election Companion",
     page_icon="🗳️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# 🌍 ACCESSIBILITY & SEO METADATA
+st.markdown("""
+    <head>
+        <meta name="description" content="CivicGuide AI: A multilingual, AI-powered election assistant helping citizens find polling booths, track crowd density, and cast informed votes.">
+        <meta name="keywords" content="election, voting, india, polling station, civic guide, voter assistance">
+        <meta property="og:title" content="CivicGuide AI">
+        <meta property="og:description" content="Your intelligent companion for a frictionless voting experience.">
+    </head>
+    <a href="#main-content" class="skip-link" style="position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;">
+        Skip to main content
+    </a>
+""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────
 # LANGUAGE  (12 languages)
@@ -511,7 +535,8 @@ with st.sidebar:
     menu = st.radio(
         "Navigation",
         ["Dashboard", "Journey", "Map", "AI Assistant", "Timeline", "Voting Guide", "Quiz", "Help Center"],
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        help=t("Select a page to navigate")
     )
 
     st.markdown("<div class='cg-divider'></div>", unsafe_allow_html=True)
@@ -539,18 +564,21 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+# 🏁 START MAIN CONTENT LANDMARK
+st.markdown("<main id='main-content'>", unsafe_allow_html=True)
+
 
 # ─────────────────────────────────────────
 # HELPERS
 # ─────────────────────────────────────────
 def metric_card(label: str, value: str, sub: str, badge: str, badge_cls: str, bar_color: str) -> str:
     return f"""
-    <div class="metric-card">
+    <div class="metric-card" role="region" aria-label="{label} metric">
       <div class="top-bar" style="background:linear-gradient(90deg,{bar_color},transparent 70%)"></div>
       <div class="m-label">{label}</div>
-      <div class="m-value">{value}</div>
+      <div class="m-value" aria-live="polite">{value}</div>
       <div class="m-sub">{sub}</div>
-      <div class="badge {badge_cls}">{badge}</div>
+      <div class="badge {badge_cls}" role="status">{badge}</div>
     </div>
     """
 

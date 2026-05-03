@@ -1,18 +1,28 @@
 import requests
 from app.config import GOOGLE_MAPS_API_KEY
 import streamlit as st
+from typing import Tuple, List, Dict, Optional, Any
 
 
 # ---------------- GEOCODING ----------------
-def geocode_location(location):
+def geocode_location(location: str) -> Tuple[Optional[float], Optional[float]]:
+    """
+    Converts a human-readable address or coordinate string into (latitude, longitude).
+    
+    Args:
+        location: Address string (e.g., 'Bengaluru') or coordinate pair (e.g., '12.9,77.5').
+        
+    Returns:
+        A tuple of (lat, lng). Returns (None, None) if geocoding fails.
+    """
     try:
-        # If it's already a lat,lng string, return it
+        # 📍 Check if input is already raw coordinates
         if "," in location:
             parts = location.split(",")
             if len(parts) == 2:
                 try:
                     return float(parts[0].strip()), float(parts[1].strip())
-                except:
+                except ValueError:
                     pass
 
         url = "https://maps.googleapis.com/maps/api/geocode/json"
@@ -29,171 +39,117 @@ def geocode_location(location):
             return loc["lat"], loc["lng"]
 
     except Exception as e:
-        print("GEOCODE ERROR:", e)
+        print(f"GEOCODE ERROR: {e}")
 
     return None, None
 
 
-# ---------------- MAIN FUNCTION ----------------
+# ---------------- SEARCH POLLING STATIONS ----------------
 @st.cache_data(show_spinner=False)
-def get_polling_stations(location, bias_lat=None, bias_lng=None):
+def get_polling_stations(location: str, bias_lat: Optional[float] = None, bias_lng: Optional[float] = None) -> List[Dict[str, Any]]:
+    """
+    Searches for polling stations near a location using the Google Places (New) API.
+    Uses strict Indian regional biasing to prevent international drift.
+    
+    Args:
+        location: The user's search area.
+        bias_lat: Optional latitude for regional weighting.
+        bias_lng: Optional longitude for regional weighting.
+        
+    Returns:
+        A list of dictionaries containing station name, address, coordinates, and rating.
+    """
     try:
-        print(f"Fetching stations for: {location}")
+        print(f"DEBUG: Fetching stations for: {location}")
 
         url = "https://places.googleapis.com/v1/places:searchText"
-
         lat, lng = geocode_location(location)
-
-        session = requests.Session()
 
         headers = {
             "Content-Type": "application/json",
             "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
-            "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.location"
+            "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.location,places.rating"
         }
 
+        # 🇮🇳 Strategy: Search for "polling station" and fallback to "government school"
         queries = [
             f"polling station near {location}, India",
-            f"government school near {location}, India",
-            f"municipal office near {location}, India",
-            f"tahsildar office near {location}, India"
+            f"government school near {location}, India"
         ]
 
-        for query in queries:
+        stations = []
+        station_names = set()
 
-            body = {
-                "textQuery": query,
-                "rankPreference": "DISTANCE"
-            }
-
+        for q in queries:
+            print(f"DEBUG: QUERY: {q}")
+            payload = {"textQuery": q}
+            
+            # Add bias if coordinates are available
             if lat and lng:
-                body["locationBias"] = {
+                payload["locationBias"] = {
                     "circle": {
-                        "center": {
-                            "latitude": lat,
-                            "longitude": lng
-                        },
+                        "center": {"latitude": lat, "longitude": lng},
                         "radius": 5000.0
                     }
                 }
 
-            for attempt in range(2):
-                try:
-                    response = session.post(url, json=body, headers=headers, timeout=5)
-                    data = response.json()
-                    break
-                except Exception as e:
-                    print(f"Retry {attempt+1} failed:", e)
-                    data = {}
-
-            print("QUERY:", query)
-            print("RESULT COUNT:", len(data.get("places", [])))
-
-            if "places" not in data:
-                continue
+            res = requests.post(url, json=payload, headers=headers, timeout=10)
+            data = res.json()
 
             results = data.get("places", [])
+            print(f"DEBUG: RESULT COUNT: {len(results)}")
 
-            if results:
-                stations = []
-
-                for place in results[:5]:
-                    name = place.get("displayName", {}).get("text", "Unknown")
-                    address = place.get("formattedAddress", "")
-
-                    lat_p = place.get("location", {}).get("latitude")
-                    lng_p = place.get("location", {}).get("longitude")
-
-                    if lat_p is None or lng_p is None:
-                        continue
-
-                    nav_link = (
-                        f"https://www.google.com/maps/dir/?api=1"
-                        f"&origin=Current+Location"
-                        f"&destination={lat_p},{lng_p}"
-                        f"&travelmode=driving"
-                    )
-
+            for p in results:
+                name = p["displayName"]["text"]
+                if name not in station_names:
                     stations.append({
                         "name": name,
-                        "address": address,
-                        "lat": lat_p,
-                        "lng": lng_p,
-                        "nav_link": nav_link
+                        "address": p.get("formattedAddress", ""),
+                        "lat": p["location"]["latitude"],
+                        "lng": p["location"]["longitude"],
+                        "rating": p.get("rating", 0.0)
                     })
+                    station_names.add(name)
 
-                if stations:
-                    return stations
-
-        print("Using fallback locations")
-
-        return [
-            {
-                "name": "Nearest Government School",
-                "address": location,
-                "lat": lat,
-                "lng": lng,
-                "nav_link": f"https://www.google.com/maps/search/?api=1&query=school+near+{location}"
-            },
-            {
-                "name": "Municipal Office",
-                "address": location,
-                "lat": lat,
-                "lng": lng,
-                "nav_link": f"https://www.google.com/maps/search/?api=1&query=government+office+near+{location}"
-            }
-        ]
+        return stations
 
     except Exception as e:
-        print("MAP ERROR:", e)
+        print(f"PLACES API ERROR: {e}")
         return []
 
 
-# ---------------- ROUTES API (NEW - ADDED HERE) ----------------
-def get_route_details(origin_lat, origin_lng, dest_lat, dest_lng):
+# ---------------- ROUTE DETAILS ----------------
+def get_route_details(origin_lat: float, origin_lng: float, dest_lat: float, dest_lng: float) -> Dict[str, Any]:
+    """
+    Calculates walking/driving route between two points using Google Directions API.
+    
+    Args:
+        origin_lat, origin_lng: Starting coordinates.
+        dest_lat, dest_lng: Destination coordinates.
+        
+    Returns:
+        A dictionary containing distance text, duration text, and raw polyline.
+    """
     try:
-        url = "https://routes.googleapis.com/directions/v2:computeRoutes"
-
-        headers = {
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": GOOGLE_MAPS_API_KEY,
-            "X-Goog-FieldMask": "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline"
+        url = "https://maps.googleapis.com/maps/api/directions/json"
+        params = {
+            "origin": f"{origin_lat},{origin_lng}",
+            "destination": f"{dest_lat},{dest_lng}",
+            "mode": "walking",
+            "key": GOOGLE_MAPS_API_KEY
         }
 
-        body = {
-            "origin": {
-                "location": {
-                    "latLng": {
-                        "latitude": origin_lat,
-                        "longitude": origin_lng
-                    }
-                }
-            },
-            "destination": {
-                "location": {
-                    "latLng": {
-                        "latitude": dest_lat,
-                        "longitude": dest_lng
-                    }
-                }
-            },
-            "travelMode": "DRIVE"
-        }
-
-        res = requests.post(url, json=body, headers=headers, timeout=5)
+        res = requests.get(url, params=params, timeout=10)
         data = res.json()
 
-        if "routes" not in data:
-            return None, None, None
-
-        route = data["routes"][0]
-
-        duration = route.get("duration")
-        distance = route.get("distanceMeters")
-        polyline = route.get("polyline", {}).get("encodedPolyline")
-
-        return duration, distance, polyline
-
+        if data["status"] == "OK":
+            route = data["routes"][0]["legs"][0]
+            return {
+                "distance": route["distance"]["text"],
+                "duration": route["duration"]["text"],
+                "polyline": data["routes"][0]["overview_polyline"]["points"]
+            }
     except Exception as e:
-        print("ROUTE ERROR:", e)
-        return None, None, None
+        print(f"DIRECTIONS API ERROR: {e}")
+
+    return {"distance": "N/A", "duration": "N/A", "polyline": None}

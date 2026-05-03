@@ -160,7 +160,32 @@ Optimized Polling Booth Suggestion
 
 ---
 
-## ⚙️ Setup
+## ⭐ Premium Features (FAANG-Level)
+
+- **🛰️ Auto-Track GPS:** Zero-touch location detection with real-time sidebar tracking for effortless navigation.
+- **🧠 AI Strategy Generator:** Personalized, high-impact voting plans tailored to your specific profile and constituency.
+- **🎟️ Digital Voting Pass:** Premium ticket-style calendar reminders with celebratory UI effects and Gmail integration.
+- **📊 Real-time Crowd Pulse:** Live booth occupancy tracking powered by Firebase Firestore for smart timing.
+- **🗺️ Precision Geospatial Bias:** India-specific location locking to ensure zero international drift.
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+graph TD
+    User((User)) --> Streamlit[Streamlit Frontend]
+    Streamlit --> Gemini[Google Gemini AI]
+    Streamlit --> Maps[Google Maps Platform]
+    Streamlit --> Firebase[Firebase Firestore]
+    Gemini --> Strategy[Voting Strategy]
+    Maps --> Route[Booth Routing]
+    Firebase --> Crowd[Crowd Pulse]
+```
+
+---
+
+## ⚙️ Setup & Installation
 
 ### 1️⃣ Install dependencies
 ```bash
@@ -168,14 +193,32 @@ pip install -r requirements.txt
 ```
 
 ### 2️⃣ Configure Environment Variables
-Create a `.env` file and add necessary API keys (Google Gemini, Maps). Ensure `firebase_key.json` is configured if using Firebase.
+Create a `.env` file and add:
+```text
+GEMINI_API_KEY=your_key
+GOOGLE_MAPS_API_KEY=your_key
+```
 
 ### 3️⃣ Run the application
 ```bash
 streamlit run app/main.py
 ```
 
-*(Note: Adjust the launch script if your entry point is different)*
+---
+
+## 🧪 Testing
+
+The project maintains a high standard of reliability with a comprehensive test suite covering core logic, security, and edge cases.
+
+### Run all tests
+```bash
+python -m pytest tests/ -v
+```
+
+### Coverage includes:
+- **Validators:** Age boundaries, XSS prevention, and prompt injection filters.
+- **User Model:** Pydantic schema validation and eligibility logic.
+- **Services:** Election guidance, Firebase safety guards, and coordinate math.
 
 ---
 
