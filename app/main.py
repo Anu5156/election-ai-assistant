@@ -51,6 +51,13 @@ if "geo" not in st.session_state: st.session_state.geo = None
 if "detecting_gps" not in st.session_state: st.session_state.detecting_gps = False
 if "navigation_menu" not in st.session_state: st.session_state.navigation_menu = "Dashboard"
 
+# ── Programmatic Redirect Handler ──
+# If a route wants to switch pages, it sets 'target_menu' and reruns.
+# We must update the widget state BEFORE it is instantiated in the sidebar.
+if "target_menu" in st.session_state:
+    st.session_state.navigation_menu = st.session_state.target_menu
+    del st.session_state.target_menu
+
 # ── Accessibility Layer ──
 st.markdown('<div id="sr-announcer" role="status" aria-live="polite" style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;">Application Loaded.</div>', unsafe_allow_html=True)
 

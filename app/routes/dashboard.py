@@ -100,7 +100,7 @@ def render_dashboard(t, days_left, election_date, countdown_display):
                         voting_location=voting_loc if voting_loc.strip() else location,
                         is_registered=registered, latitude=lat_val, longitude=lng_val
                     )
-                    st.session_state.navigation_menu = "Journey" # Switch page
+                    st.session_state.target_menu = "Journey" # Set target for main.py handler
                     st.rerun()
                 except Exception as e:
                     st.error(f"{t('Error saving profile')}: {str(e)}")
