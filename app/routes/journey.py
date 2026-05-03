@@ -4,7 +4,6 @@ Handles the personalized voting journey, booth scoring, and progress tracking.
 """
 
 import streamlit as st
-import textwrap
 from app.utils.ui_components import topbar, render_journey_steps
 from app.services.maps_service import fetch_polling_stations, calculate_distance, get_route_details
 from app.services.firebase_service import get_booth_crowd
@@ -54,15 +53,6 @@ def journey_ui(user, target_lang, t, base_lat, base_lng, crowd_data):
     st.markdown(f"### 🏆 {t('Top Recommendation')}")
     dist = calculate_distance(b_lat, b_lng, best_booth["lat"], best_booth["lng"])
     
-    st.markdown(textwrap.dedent(f"""
-    <div class="cg-card blue" style="border-left: 4px solid #3b82f6;">
-        <h4 style="margin:0">🏫 {best_booth['name']}</h4>
-        <p style="color:#8ba3c4; font-size:14px; margin:5px 0;">{best_booth['address']}</p>
-        <div style="display:flex; gap:20px; margin-top:15px;">
-            <div>📏 <b>{t('Distance')}:</b> {dist:.2f} km</div>
-            <div>👥 <b>{t('Live Crowd')}:</b> {crowd_data.get(best_booth['name'], 0)} {t('people')}</div>
-        </div>
-    </div>
-    """), unsafe_allow_html=True)
+    st.markdown(f'<div class="cg-card blue" style="border-left: 4px solid #3b82f6;"><h4 style="margin:0">🏫 {best_booth["name"]}</h4><p style="color:#8ba3c4; font-size:14px; margin:5px 0;">{best_booth["address"]}</p><div style="display:flex; gap:20px; margin-top:15px;"><div>📏 <b>{t("Distance")}:</b> {dist:.2f} km</div><div>👥 <b>{t("Live Crowd")}:</b> {crowd_data.get(best_booth["name"], 0)} {t("people")}</div></div></div>', unsafe_allow_html=True)
 
     st.info(t("Pro Tip: This booth is selected based on a hybrid score of proximity and current crowd density."))

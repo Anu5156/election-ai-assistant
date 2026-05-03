@@ -104,7 +104,6 @@ with st.sidebar:
         st.info("CivicGuide AI processes all geospatial data in-memory and does not store permanent GPS logs.")
 
 # ── MAIN CONTENT ──
-st.markdown("<main id='main-content'>", unsafe_allow_html=True)
 
 # Calculate global variables for routes
 days_left = (ELECTION_DATE - datetime.now()).days

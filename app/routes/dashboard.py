@@ -6,7 +6,6 @@ Handles the primary user overview, profile management, and live analytics.
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import textwrap
 from datetime import datetime
 from app.utils.ui_components import topbar, render_metrics_row
 from app.services.gemini_service import get_ai_strategy
@@ -33,14 +32,7 @@ def render_dashboard(t, days_left, election_date, countdown_display):
         st.markdown(f"### ✨ {t('Your Personalized Strategy')}")
         with st.container():
             strategy = get_ai_strategy(user.age, user.location, user.voting_location, user.is_registered)
-            st.markdown(textwrap.dedent(f"""
-            <div class="cg-card blue" style="border-left: 4px solid #3b82f6;">
-                <div style="display: flex; align-items: flex-start; gap: 15px;">
-                    <div style="font-size: 24px;">🤖</div>
-                    <div style="font-style: italic; color: #e2eaf5;">{strategy}</div>
-                </div>
-            </div>
-            """), unsafe_allow_html=True)
+            st.markdown(f'<div class="cg-card blue" style="border-left: 4px solid #3b82f6;"><div style="display: flex; align-items: flex-start; gap: 15px;"><div style="font-size: 24px;">🤖</div><div style="font-style: italic; color: #e2eaf5;">{strategy}</div></div></div>', unsafe_allow_html=True)
     
     # ── Live Analytics ──
     st.markdown(f"### 📈 {t('Live Participation Trends')}")
@@ -89,13 +81,7 @@ def render_dashboard(t, days_left, election_date, countdown_display):
     if geo:
         lat, lng = geo["coords"]["latitude"], geo["coords"]["longitude"]
         location = f"{lat},{lng}"
-        st.markdown(textwrap.dedent(f"""
-            <div class="cg-card blue" style="border-left: 4px solid #3b82f6; margin-bottom: 20px;">
-                <div style="font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; color: #3b82f6;">{t('Verified Live Location')}</div>
-                <div style="font-size: 18px; font-weight: 700; margin-top: 5px;">📍 {t('Coordinates Locked')}</div>
-                <div style="font-family: 'DM Mono', monospace; font-size: 12px; color: #8ba3c4;">{round(lat,6)}, {round(lng,6)}</div>
-            </div>
-        """), unsafe_allow_html=True)
+        st.markdown(f'<div class="cg-card blue" style="border-left: 4px solid #3b82f6; margin-bottom: 20px;"><div style="font-size: 10px; font-family: \'DM Mono\', monospace; text-transform: uppercase; color: #3b82f6;">{t("Verified Live Location")}</div><div style="font-size: 18px; font-weight: 700; margin-top: 5px;">📍 {t("Coordinates Locked")}</div><div style="font-family: \'DM Mono\', monospace; font-size: 12px; color: #8ba3c4;">{round(lat,6)}, {round(lng,6)}</div></div>', unsafe_allow_html=True)
         if st.button("🔄 " + t("Reset & Use Manual Address")):
             st.session_state.geo = None
             st.rerun()

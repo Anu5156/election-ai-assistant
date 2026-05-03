@@ -29,12 +29,7 @@ def render_timeline(t):
     st.progress((current + 1) / len(steps))
 
     title, desc = steps[current]
-    st.markdown(f"""
-    <div class="cg-card" style="animation: fadeIn 0.6s ease-in-out;">
-        <h3>{title}</h3>
-        <p style="color:#8ba3c4">{desc}</p>
-    </div>
-    """, unsafe_allow_html=True)
+    st.markdown(f'<div class="cg-card" style="animation: fadeIn 0.6s ease-in-out;"><h3>{title}</h3><p style="color:#8ba3c4">{desc}</p></div>', unsafe_allow_html=True)
 
     if st.button(t("🧠 Detailed Explanation")):
         with st.spinner(t("Generating explanation...")):
