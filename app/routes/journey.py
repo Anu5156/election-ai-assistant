@@ -5,7 +5,7 @@ Handles the personalized voting journey, booth scoring, and progress tracking.
 
 import streamlit as st
 from app.utils.ui_components import topbar, render_journey_steps
-from app.services.maps_service import load_stations, calculate_distance, get_route_details
+from app.services.maps_service import fetch_polling_stations, calculate_distance, get_route_details
 from app.services.firebase_service import get_booth_crowd
 
 def score_booth(s, base_lat, base_lng, crowd_data):
@@ -35,7 +35,7 @@ def journey_ui(user, target_lang, t, base_lat, base_lng, crowd_data):
 
     # ── Booth Recommendations ──
     search_loc = user.voting_location if user.voting_location else user.location
-    stations = load_stations(search_loc)
+    stations = fetch_polling_stations(search_loc)
     
     if not stations:
         st.error(t("No polling stations found in your area."))

@@ -10,7 +10,7 @@ from folium.plugins import MiniMap, Fullscreen, HeatMap
 from streamlit_folium import st_folium
 import polyline
 from app.utils.ui_components import topbar
-from app.services.maps_service import load_stations, geocode_location, get_route_details, calculate_distance
+from app.services.maps_service import fetch_polling_stations, geocode_location, get_route_details, calculate_distance
 from app.services.firebase_service import get_booth_crowd
 
 def score_booth_map(s, base_lat, base_lng, crowd_data):
@@ -31,7 +31,7 @@ def render_map_page(t, target_lang):
 
     user = st.session_state.user_data
     search_loc = user.voting_location if user.voting_location else user.location
-    stations = load_stations(search_loc)
+    stations = fetch_polling_stations(search_loc)
 
     base_lat, base_lng = user.latitude, user.longitude
     if base_lat is None:

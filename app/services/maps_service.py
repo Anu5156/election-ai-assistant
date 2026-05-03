@@ -96,5 +96,5 @@ def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng/2)**2
     return round(R * 2 * atan2(sqrt(a), sqrt(1-a)), 2)
 
-# Aliases for modular routes
-load_stations = get_polling_stations
+# Alias for modular routes (Renamed to bypass cloud cache)
+fetch_polling_stations = get_polling_stations
