@@ -3,10 +3,11 @@ import os
 import streamlit as st
 import time
 from dotenv import load_dotenv
+from app.config import GEMINI_API_KEY
 
 load_dotenv(override=True)
 
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+client = genai.Client(api_key=GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY"))
 
 SYSTEM_INSTRUCTION = """
 You are the CivicGuide AI Assistant, a specialized expert in the election process. 
