@@ -1,106 +1,49 @@
+"""
+Chat Route - CivicGuide AI
+Handles the AI conversational interface for election queries.
+"""
+
 import streamlit as st
-from app.models.user import User
-from app.services.ai_service import generate_guidance
-from app.services.translate_service import translate_text
-from app.utils.validators import sanitize_input
-from app.services.recommendation import recommend_info
+from app.utils.ui_components import topbar
+from app.services.gemini_service import get_gemini_response
+from app.utils.validators import sanitize_input, is_rate_limited
 
-def chat_ui(age, location, registered, target_lang, t):
+def render_chat_page(t):
+    """
+    Renders the AI Assistant chat page.
+    """
+    topbar("🤖 " + t("AI Election Assistant"), [("Live AI", "badge-green")])
 
-    st.markdown("## 💬 " + t("Ask About Elections"))
+    st.markdown(f"## {t('Ask anything about elections')}")
 
-    # -------- SESSION CHAT HISTORY --------
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+    # -------- INITIALIZE HISTORY --------
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-    # -------- SUGGESTIONS --------
-    st.markdown("### 💡 " + t("Try asking:"))
+    # -------- DISPLAY HISTORY --------
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-    suggestions = [
-        "How do I vote?",
-        "Where is my polling station?",
-        "What documents are required?",
-        "Am I eligible to vote?",
-        "What is the best time to vote?"
-    ]
-    user = User(age=age, location=location, is_registered=registered)
-    if st.button("🧠 Get Voting Guidance"):
-        st.info(translate_text(recommend_info(user), target_lang))
+    # -------- USER INPUT --------
+    if prompt := st.chat_input(t("What would you like to know?")):
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        st.session_state.messages.append({"role": "user", "content": prompt})
 
-    cols = st.columns(2)
+        with st.chat_message("assistant"):
+            if is_rate_limited():
+                st.warning("⚠️ Slow down! Please wait a moment between questions.")
+            elif not sanitize_input(prompt):
+                st.error("🚨 Suspicious activity detected. Your query has been blocked for safety.")
+            else:
+                with st.spinner(t("Analyzing and generating response...")):
+                    # Pass history for context
+                    response = get_gemini_response(prompt, history=st.session_state.messages[-5:])
+                    st.markdown(response)
+                    st.session_state.messages.append({"role": "assistant", "content": response})
 
-    for i, s in enumerate(suggestions):
-        if cols[i % 2].button(t(s)):
-            st.session_state["quick_query"] = s
-
-    # -------- INPUT --------
-    query = st.text_input(
-        t("Ask your question"),
-        value=st.session_state.get("quick_query", "")
-    )
-
-    # clear quick query after use
-    if "quick_query" in st.session_state:
-        del st.session_state["quick_query"]
-
-    # -------- SEND BUTTON --------
-    if st.button(t("Ask AI")):
-
-        if query.strip() == "":
-            st.error(t("Please enter a question"))
-
-        elif not sanitize_input(query):
-            st.error(t("Unsafe input detected"))
-
-        else:
-            try:
-                user = User(
-                    age=age,
-                    location=location,
-                    is_registered=registered
-                )
-
-                with st.spinner(t("Thinking...")):
-                    response = generate_guidance(user, query)
-
-                translated = translate_text(response, target_lang)
-
-                # -------- SAVE HISTORY --------
-                st.session_state.chat_history.append({
-                    "q": query,
-                    "a": translated
-                })
-
-            except Exception as e:
-                st.error(t("AI service unavailable"))
-
-                fallback = "Please visit the official election website or nearest polling office."
-                translated = translate_text(fallback, target_lang)
-
-                st.session_state.chat_history.append({
-                    "q": query,
-                    "a": translated
-                })
-
-    # -------- DISPLAY CHAT HISTORY --------
-    for chat in reversed(st.session_state.chat_history):
-
-        # USER MESSAGE
-        st.markdown(f"""
-        <div style="
-            background:#1f2937;
-            padding:12px;
-            border-radius:12px;
-            margin-bottom:8px;
-        ">
-        🧑 {chat['q']}
-        </div>
-        """, unsafe_allow_html=True)
-
-        # AI RESPONSE
-        st.markdown(f"""
-        <div class="card">
-        🤖 <b>{t("AI Assistant")}</b><br><br>
-        {chat['a']}
-        </div>
-        """, unsafe_allow_html=True)
+    if st.button(t("Clear Conversation")):
+        st.session_state.messages = []
+        st.rerun()
