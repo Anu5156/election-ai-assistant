@@ -33,10 +33,15 @@ def render_map_page(t, target_lang):
     search_loc = user.voting_location if user.voting_location else user.location
     stations = fetch_polling_stations(search_loc)
 
+    if not stations:
+        st.error(t("No polling stations found in your area. Please check your location settings."))
+        return
+
     base_lat, base_lng = user.latitude, user.longitude
     if base_lat is None:
         base_lat, base_lng = geocode_location(user.location)
         if base_lat is None:
+            # Fallback to the first station if geocoding fails
             base_lat, base_lng = stations[0]["lat"], stations[0]["lng"]
 
     crowd_data = get_booth_crowd() or {}
@@ -59,12 +64,14 @@ def render_map_page(t, target_lang):
         ).add_to(m)
 
     # ── Route & Heatmap ──
+    duration = "N/A"
     try:
-        duration, _, poly_str = get_route_details(base_lat, base_lng, nearest["lat"], nearest["lng"])
+        dur, _, poly_str = get_route_details(base_lat, base_lng, nearest["lat"], nearest["lng"])
         if poly_str:
             folium.PolyLine(polyline.decode(poly_str), color="#2563eb", weight=6).add_to(m)
+            duration = dur
     except:
-        duration = "N/A"
+        pass
 
     heat_data = [[s["lat"], s["lng"]] for s in stations for _ in range(random.randint(3, 8))]
     HeatMap(heat_data).add_to(m)
