@@ -6,6 +6,7 @@ Handles the primary user overview, profile management, and live analytics.
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import textwrap
 from datetime import datetime
 from app.utils.ui_components import topbar, render_metrics_row
 from app.services.gemini_service import get_ai_strategy
@@ -18,12 +19,6 @@ from streamlit_js_eval import get_geolocation
 def render_dashboard(t, days_left, election_date, countdown_display):
     """
     Renders the complete Dashboard view.
-    
-    Args:
-        t: Translation function.
-        days_left: Integer days until election.
-        election_date: Datetime object of election.
-        countdown_display: Formatted string for countdown.
     """
     topbar(
         "📊 " + t("Dashboard"),
@@ -38,14 +33,14 @@ def render_dashboard(t, days_left, election_date, countdown_display):
         st.markdown(f"### ✨ {t('Your Personalized Strategy')}")
         with st.container():
             strategy = get_ai_strategy(user.age, user.location, user.voting_location, user.is_registered)
-            st.markdown(f"""
+            st.markdown(textwrap.dedent(f"""
             <div class="cg-card blue" style="border-left: 4px solid #3b82f6;">
                 <div style="display: flex; align-items: flex-start; gap: 15px;">
                     <div style="font-size: 24px;">🤖</div>
                     <div style="font-style: italic; color: #e2eaf5;">{strategy}</div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """), unsafe_allow_html=True)
     
     # ── Live Analytics ──
     st.markdown(f"### 📈 {t('Live Participation Trends')}")
@@ -61,12 +56,9 @@ def render_dashboard(t, days_left, election_date, countdown_display):
         template="plotly_dark"
     )
     fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font_family="DM Sans",
-        hovermode="x unified",
-        margin=dict(l=0, r=0, t=40, b=0),
-        height=300
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        font_family="DM Sans", hovermode="x unified",
+        margin=dict(l=0, r=0, t=40, b=0), height=300
     )
     fig.update_xaxes(showgrid=False)
     fig.update_yaxes(showgrid=True, gridcolor="rgba(30,48,80,0.5)")
@@ -90,22 +82,20 @@ def render_dashboard(t, days_left, election_date, countdown_display):
             st.session_state.geo = get_geolocation()
     
     with col_gps2:
-        if st.session_state.geo:
-            st.success(f"📡 {t('Live GPS Locked')}")
-        else:
-            st.warning(f"📡 {t('GPS Not Used (Manual Mode)')}")
+        if st.session_state.geo: st.success(f"📡 {t('Live GPS Locked')}")
+        else: st.warning(f"📡 {t('GPS Not Used (Manual Mode)')}")
 
     geo = st.session_state.geo
     if geo:
         lat, lng = geo["coords"]["latitude"], geo["coords"]["longitude"]
         location = f"{lat},{lng}"
-        st.markdown(f"""
+        st.markdown(textwrap.dedent(f"""
             <div class="cg-card blue" style="border-left: 4px solid #3b82f6; margin-bottom: 20px;">
                 <div style="font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; color: #3b82f6;">{t('Verified Live Location')}</div>
                 <div style="font-size: 18px; font-weight: 700; margin-top: 5px;">📍 {t('Coordinates Locked')}</div>
                 <div style="font-family: 'DM Mono', monospace; font-size: 12px; color: #8ba3c4;">{round(lat,6)}, {round(lng,6)}</div>
             </div>
-        """, unsafe_allow_html=True)
+        """), unsafe_allow_html=True)
         if st.button("🔄 " + t("Reset & Use Manual Address")):
             st.session_state.geo = None
             st.rerun()
@@ -121,12 +111,9 @@ def render_dashboard(t, days_left, election_date, countdown_display):
         else:
             lat_val, lng_val = (geo["coords"]["latitude"], geo["coords"]["longitude"]) if geo else geocode_location(location)
             st.session_state.user_data = User(
-                age=age, 
-                location=location, 
+                age=age, location=location, 
                 voting_location=voting_loc if voting_loc.strip() else location,
-                is_registered=registered,
-                latitude=lat_val,
-                longitude=lng_val
+                is_registered=registered, latitude=lat_val, longitude=lng_val
             )
             st.success(t("Profile saved. Head to Journey →"))
 
@@ -136,10 +123,8 @@ def render_dashboard(t, days_left, election_date, countdown_display):
     st.markdown('<div class="cg-card blue">', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
-    with col1:
-        reminder_date = st.date_input(t("Election Date"))
-    with col2:
-        reminder_time = st.time_input(t("Reminder Time"))
+    with col1: reminder_date = st.date_input(t("Election Date"))
+    with col2: reminder_time = st.time_input(t("Reminder Time"))
 
     default_loc = st.session_state.user_data.location if st.session_state.user_data else ""
     loc_rem = st.text_input(t("Location for reminder"), value=default_loc)
