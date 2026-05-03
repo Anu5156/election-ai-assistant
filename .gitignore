@@ -1,5 +1,23 @@
-.env
-firebase_key.json
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.env
+.venv
+venv/
+ENV/
 
+# Streamlit
+.streamlit/config.toml
+.streamlit/secrets.toml
+
+# Firebase
+firebase_key.json
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

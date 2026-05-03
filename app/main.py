@@ -107,6 +107,8 @@ st.set_page_config(
 st.markdown("""
     <script>
         document.documentElement.lang = 'en';
+        const isHighContrast = window.localStorage.getItem('highContrast') === 'true';
+        document.documentElement.setAttribute('data-high-contrast', isHighContrast);
     </script>
     <head>
         <meta name="description" content="CivicGuide AI: A multilingual, AI-powered election assistant helping citizens find polling booths, track crowd density, and cast informed votes.">
@@ -160,6 +162,26 @@ for k, v in _defaults.items():
 st.markdown(
     """
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+    /* ── High Contrast Mode Override ── */
+    [data-high-contrast="true"] body, 
+    [data-high-contrast="true"] [data-testid="stAppViewContainer"] {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+    }
+    [data-high-contrast="true"] .cg-card,
+    [data-high-contrast="true"] .metric-card {
+        background: #f0f0f0 !important;
+        color: #000000 !important;
+        border: 2px solid #000000 !important;
+    }
+    [data-high-contrast="true"] h1, 
+    [data-high-contrast="true"] h2, 
+    [data-high-contrast="true"] h3 {
+        color: #000000 !important;
+    }
+    </style>
 
     <style>
     /* ── Reset & base ── */
@@ -573,6 +595,19 @@ with st.sidebar:
         </div>
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    st.markdown(f"### ♿ {t('Accessibility')}")
+    high_contrast = st.toggle(t("High Contrast Mode"))
+    if high_contrast:
+        st.markdown("<script>document.documentElement.setAttribute('data-high-contrast', 'true'); window.localStorage.setItem('highContrast', 'true');</script>", unsafe_allow_html=True)
+    else:
+        st.markdown("<script>document.documentElement.setAttribute('data-high-contrast', 'false'); window.localStorage.setItem('highContrast', 'false');</script>", unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown(f"### ⚖️ {t('Legal')}")
+    if st.button(t("Privacy Policy")):
+        st.info(t("CivicGuide AI respects your privacy. We do not store exact GPS locations permanently. All data is processed in-memory to provide routing and crowd density information. Voter IDs are obfuscated before being stored for analytics."))
 
 # 🏁 START MAIN CONTENT LANDMARK
 st.markdown("<main id='main-content'>", unsafe_allow_html=True)
