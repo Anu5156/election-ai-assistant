@@ -11,3 +11,5 @@ python-dotenv
 plotly
 pandas
 google-genai
+streamlit-js-eval
+numpy
