@@ -57,6 +57,7 @@ This system generates **dynamic, personalized voter journeys** using:
 ### 🔹 Smart Recommendation Engine
 
 ```text
+
 User Location  
    ↓  
 Geospatial Processor (identifies viable radius)  
@@ -65,7 +66,8 @@ Firebase Sync (real-time crowd density)
    ↓  
 Ranking Algorithm: (Distance * 0.6) + (Crowd * 0.4)  
    ↓  
-Optimized Polling Booth Suggestion  
+Optimized Polling Booth Suggestion 
+ 
 ```
 
 ### 🔹 Real-Time Synchronization Engine

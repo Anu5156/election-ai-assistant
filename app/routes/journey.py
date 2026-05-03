@@ -62,7 +62,9 @@ def create_map(stations, base_lat, base_lng, polyline_str):
 # -----------------------------------
 # 🔹 MAIN UI
 # -----------------------------------
-def journey_ui(location, target_lang, t, user_lat=None, user_lng=None):
+def journey_ui(location, target_lang, t, user_lat=None, user_lng=None, crowd_data=None):
+    if not crowd_data:
+        crowd_data = {}
 
     # -------- SESSION --------
     if "stations" not in st.session_state:
@@ -122,6 +124,11 @@ def journey_ui(location, target_lang, t, user_lat=None, user_lng=None):
         # Real-time indicators
         dist_display = f"{s['distance']} km" if s["distance"] > 0.001 else t("You are here!")
         
+        c_count = crowd_data.get(s['name'], 0)
+        if c_count < 2: crowd_status = t("Low")
+        elif c_count < 5: crowd_status = t("Medium")
+        else: crowd_status = t("High")
+
         nav_url = f"https://www.google.com/maps/dir/?api=1&destination={s['lat']},{s['lng']}"
         
         st.markdown(f"""
@@ -132,7 +139,7 @@ def journey_ui(location, target_lang, t, user_lat=None, user_lng=None):
             <p style='color:#94a3b8; font-size:14px; margin:5px 0'>🏠 {s['address']}</p>
             <div style='display:flex; gap:20px; margin-top:10px'>
                 <div>📏 <b>{t('Distance')}:</b> {dist_display}</div>
-                <div>👥 <b>{t('Crowd')}:</b> {s.get('crowd', t('Medium'))}</div>
+                <div>👥 <b>{t('Crowd')}:</b> {crowd_status}</div>
             </div>
             <a href="{nav_url}" target="_blank" style="text-decoration:none;">
                 <div style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); 

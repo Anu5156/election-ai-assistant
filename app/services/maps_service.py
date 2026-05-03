@@ -53,10 +53,10 @@ def get_polling_stations(location, bias_lat=None, bias_lng=None):
         }
 
         queries = [
-            f"government office near {location}",
-            f"municipal office near {location}",
-            f"school near {location}",
-            f"community center near {location}"
+            f"polling station near {location}, India",
+            f"government school near {location}, India",
+            f"municipal office near {location}, India",
+            f"tahsildar office near {location}, India"
         ]
 
         for query in queries:

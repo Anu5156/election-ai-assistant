@@ -42,21 +42,21 @@ def get_gemini_response(prompt, history=None):
                 
             except Exception as e:
                 err_str = str(e).lower()
+                print(f"DEBUG: Gemini Error ({model_name}): {err_str}")
                 
                 # Handling 429 Resource Exhausted gracefully
                 if "429" in err_str or "resource_exhausted" in err_str:
                     if attempt == 0:
-                        time.sleep(1) 
+                        time.sleep(2) # slightly longer wait
                         continue
                     else:
                         # Fallback to next model in list
-                        print(f"DEBUG: Model {model_name} exhausted, switching...")
                         break 
                 
-                # For unexpected errors
-                return "🤖 The AI assistant is temporarily unavailable. Please try again in a moment."
+                # For other unexpected errors, try the next model instead of giving up
+                break 
 
-    return "🤖 We're experiencing high demand for AI insights. Please wait a minute and try again."
+    return "🤖 We're experiencing high demand or intermittent connectivity. Please try your question again in a few seconds."
 
 @st.cache_data(show_spinner=False)
 def get_ai_strategy(age, location, voting_area, is_registered):

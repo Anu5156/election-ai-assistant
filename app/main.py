@@ -474,19 +474,7 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        "<div style='font-family:DM Mono,monospace;font-size:10px;text-transform:uppercase;"
-        "letter-spacing:.1em;color:#4d6585;margin-bottom:6px'>Navigation</div>",
-        unsafe_allow_html=True,
-    )
-    menu = st.radio(
-        "Navigation",
-        ["Dashboard", "Journey", "Map", "AI Assistant", "Timeline", "Voting Guide", "Quiz", "Help Center"],
-        label_visibility="collapsed"
-    )
-
-    st.markdown("<div class='cg-divider'></div>", unsafe_allow_html=True)
-
+    # 1. LANGUAGE FIRST (Required for translation function 't')
     st.markdown(
         "<div style='font-family:DM Mono,monospace;font-size:10px;text-transform:uppercase;"
         "letter-spacing:.1em;color:#4d6585;margin-bottom:6px'>Language</div>",
@@ -497,15 +485,59 @@ with st.sidebar:
         list(LANG_OPTIONS.keys()),
         label_visibility="collapsed"
     )
+    target_lang = LANG_OPTIONS[selected_lang]
 
-target_lang = LANG_OPTIONS[selected_lang]
+    # 🔥 DEFINE 't' EARLY
+    def t(text: str) -> str:
+        try:
+            return translate_text(text, target_lang)
+        except:
+            return text
 
+    # 🛰️ AUTO-TRACK TOGGLE (FAANG LEVEL)
+    st.markdown("<div class='cg-divider' style='margin:15px 0'></div>", unsafe_allow_html=True)
+    auto_gps = st.toggle("🛰️ " + t("Live GPS Tracking"), value=True)
+    if auto_gps and st.session_state.geo is None:
+        st.session_state.geo = get_geolocation()
 
-def t(text: str) -> str:
-    try:
-        return translate_text(text, target_lang)
-    except Exception:
-        return text
+    st.markdown("<div class='cg-divider'></div>", unsafe_allow_html=True)
+
+    # 2. NAVIGATION
+    st.markdown(
+        f"<div style='font-family:DM Mono,monospace;font-size:10px;text-transform:uppercase;"
+        f"letter-spacing:.1em;color:#4d6585;margin-bottom:6px'>{t('Navigation')}</div>",
+        unsafe_allow_html=True,
+    )
+    menu = st.radio(
+        "Navigation",
+        ["Dashboard", "Journey", "Map", "AI Assistant", "Timeline", "Voting Guide", "Quiz", "Help Center"],
+        label_visibility="collapsed"
+    )
+
+    st.markdown("<div class='cg-divider'></div>", unsafe_allow_html=True)
+
+    # 3. 📅 ELECTION TIMELINE
+    st.markdown(f"### 📅 {t('Election Timeline')}")
+    st.markdown(f"""
+    <div style="border-left: 2px solid #3b82f6; padding-left: 15px; margin-left: 5px;">
+        <div style="margin-bottom: 15px; position: relative;">
+            <div style="position: absolute; left: -21px; top: 0; width: 10px; height: 10px; background: #22c55e; border-radius: 50%; border: 2px solid #0d1828;"></div>
+            <div style="font-size: 11px; color: #4d6585; text-transform: uppercase;">{t('Phase 1')}</div>
+            <div style="font-size: 13px; font-weight: 600;">{t('Registration Open')}</div>
+        </div>
+        <div style="margin-bottom: 15px; position: relative;">
+            <div style="position: absolute; left: -21px; top: 0; width: 10px; height: 10px; background: #3b82f6; border-radius: 50%; border: 2px solid #0d1828;"></div>
+            <div style="font-size: 11px; color: #4d6585; text-transform: uppercase;">{t('Phase 2')}</div>
+            <div style="font-size: 13px; font-weight: 600;">{t('Candidate Finalization')}</div>
+        </div>
+        <div style="position: relative;">
+            <div style="position: absolute; left: -21px; top: 0; width: 10px; height: 10px; background: #ef4444; border-radius: 50%; border: 2px solid #0d1828; animation: pulse 2s infinite;"></div>
+            <div style="font-size: 11px; color: #4d6585; text-transform: uppercase;">{t('Big Day')}</div>
+            <div style="font-size: 13px; font-weight: 700; color: #ef4444;">{t('ELECTION DAY')}</div>
+            <div style="font-size: 11px; margin-top: 2px;">{ELECTION_DATE.strftime('%d %B, %Y')}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────
@@ -691,10 +723,20 @@ if menu == "Dashboard":
         lng = geo["coords"]["longitude"]
         location = f"{lat},{lng}"
 
-        st.markdown(
-            f'<div class="alert alert-success">✓ {t("Live Coordinates Found")}: {round(lat,4)}, {round(lng,4)}</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(f"""
+            <div class="cg-card blue" style="border-left: 4px solid #3b82f6; margin-bottom: 20px; position: relative; overflow: hidden;">
+                <div style="position: absolute; top: -10px; right: -10px; font-size: 60px; opacity: 0.05;">🛰️</div>
+                <div style="font-size: 10px; font-family: 'DM Mono', monospace; text-transform: uppercase; color: #3b82f6; letter-spacing: 1.5px;">{t('Verified Live Location')}</div>
+                <div style="font-size: 20px; font-weight: 700; margin-top: 8px; color: #e2eaf5;">📍 {t('Coordinates Locked')}</div>
+                <div style="font-family: 'DM Mono', monospace; font-size: 14px; color: #8ba3c4; margin-top: 5px;">
+                    {round(lat,6)}, {round(lng,6)}
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        if st.button("🔄 " + t("Reset & Use Manual Address")):
+            st.session_state.geo = None
+            st.rerun()
     else:
         location = st.text_input(
             t("Enter current physical location"),
@@ -904,7 +946,7 @@ elif menu == "Journey":
 
     # 📍 MAP + STATIONS
     st.markdown(f"<h3>{t('Nearby Polling Stations')}</h3>", unsafe_allow_html=True)
-    journey_ui(location, target_lang, t, base_lat, base_lng)
+    journey_ui(location, target_lang, t, base_lat, base_lng, crowd_data)
 
 # ─────────────────────────────────────────
 # PAGE — MAP (UNCHANGED BUT CLEAR PURPOSE)
