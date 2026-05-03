@@ -27,14 +27,12 @@ def render_dashboard(t, days_left, election_date, countdown_display):
     render_metrics_row(t, countdown_display, election_date)
     
     # ── GPS Logic ──
-    # We call this at the top level to ensure the JS eval has a chance to run.
-    # It will return None until the browser provides the coordinates.
     current_geo = None
     if st.session_state.get("detecting_gps", False):
         current_geo = get_geolocation()
         if current_geo:
             st.session_state.geo = current_geo
-            st.session_state.detecting_gps = False # Stop the spinner/detection once found
+            st.session_state.detecting_gps = False
     
     # ── AI Strategy ──
     if st.session_state.user_data:
@@ -50,7 +48,6 @@ def render_dashboard(t, days_left, election_date, countdown_display):
         "Hour": ["7 AM", "8 AM", "9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM", "6 PM"],
         "Voters": [120, 250, 450, 580, 420, 310, 280, 400, 520, 610, 490, 200]
     })
-    
     fig = px.area(df, x="Hour", y="Voters", title=t("Real-time Voter Turnout Estimate"), color_discrete_sequence=["#22c55e"], template="plotly_dark")
     fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_family="DM Sans", hovermode="x unified", margin=dict(l=0, r=0, t=40, b=0), height=300)
     fig.update_xaxes(showgrid=False)
@@ -61,7 +58,7 @@ def render_dashboard(t, days_left, election_date, countdown_display):
     st.markdown(f"### 🧑 {t('Your Voter Profile')}")
     st.markdown('<div class="cg-card">', unsafe_allow_html=True)
 
-    age = st.number_input(t("Your Age"), min_value=0, max_value=120, step=1)
+    age = st.number_input(t("Your Age"), min_value=0, max_value=120, step=1, key="profile_age")
     if 0 < age < 18: st.warning(t("You must be at least 18 years old to vote."))
     elif age >= 18: st.success(t("Great news! You are eligible to participate in the democratic process."))
 
@@ -71,14 +68,10 @@ def render_dashboard(t, days_left, election_date, countdown_display):
         if st.button("🛰️ " + t("Detect GPS")):
             st.session_state.detecting_gps = True
             st.rerun()
-    
     with col_gps2:
-        if st.session_state.get("geo"):
-            st.success(f"📡 {t('Live GPS Locked')}")
-        elif st.session_state.get("detecting_gps"):
-            st.info(f"⏳ {t('Fetching location... Please allow browser access.')}")
-        else:
-            st.warning(f"📡 {t('GPS Not Used (Manual Mode)')}")
+        if st.session_state.get("geo"): st.success(f"📡 {t('Live GPS Locked')}")
+        elif st.session_state.get("detecting_gps"): st.info(f"⏳ {t('Fetching location...')}")
+        else: st.warning(f"📡 {t('GPS Not Used (Manual Mode)')}")
 
     geo = st.session_state.get("geo")
     if geo:
@@ -90,22 +83,27 @@ def render_dashboard(t, days_left, election_date, countdown_display):
             st.session_state.detecting_gps = False
             st.rerun()
     else:
-        location = st.text_input(t("Enter current physical location"), placeholder="e.g. Ramanagara, Bengaluru")
+        location = st.text_input(t("Enter current physical location"), placeholder="e.g. Ramanagara, Bengaluru", key="profile_location")
     
-    voting_loc = st.text_input(t("Voting Constituency / Area (Optional)"), placeholder=t("Enter your registered voting area if different"))
-    registered = st.checkbox(t("I am registered to vote"))
+    voting_loc = st.text_input(t("Voting Constituency / Area (Optional)"), placeholder=t("Enter your registered voting area if different"), key="profile_voting_loc")
+    registered = st.checkbox(t("I am registered to vote"), key="profile_registered")
 
     if st.button(t("🚀 Start My Journey"), disabled=(age<18)):
         if not location.strip():
             st.error(t("Please enter your location."))
         else:
-            lat_val, lng_val = (geo["coords"]["latitude"], geo["coords"]["longitude"]) if geo else geocode_location(location)
-            st.session_state.user_data = User(
-                age=age, location=location, 
-                voting_location=voting_loc if voting_loc.strip() else location,
-                is_registered=registered, latitude=lat_val, longitude=lng_val
-            )
-            st.success(t("Profile saved. Head to Journey →"))
+            with st.spinner(t("Saving profile...")):
+                try:
+                    lat_val, lng_val = (geo["coords"]["latitude"], geo["coords"]["longitude"]) if geo else geocode_location(location)
+                    st.session_state.user_data = User(
+                        age=age, location=location, 
+                        voting_location=voting_loc if voting_loc.strip() else location,
+                        is_registered=registered, latitude=lat_val, longitude=lng_val
+                    )
+                    st.session_state.navigation_menu = "Journey" # Switch page
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"{t('Error saving profile')}: {str(e)}")
 
     # ── Reminders ──
     st.markdown("<div class='cg-divider'></div>", unsafe_allow_html=True)

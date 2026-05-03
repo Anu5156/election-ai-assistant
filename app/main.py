@@ -1,16 +1,6 @@
 """
-CivicGuide AI - The Ultimate AI-Powered Election Assistant
-Main Orchestration Module
-
-This application provides citizens with localized, real-time election information including:
-- Polling booth discovery and routing (Google Maps API)
-- Real-time crowd density tracking (Firebase Firestore)
-- Personalized voting strategies (Google Gemini AI)
-- Multi-language support (12 Indian languages)
-- Digital Voting Pass and calendar reminders
-
-Author: CivicGuide AI Team
-License: MIT
+CivicGuide AI - Main Orchestration Module
+FAANG-Standard Architecture v3.0
 """
 
 import streamlit as st
@@ -39,7 +29,7 @@ from app.utils.validators import validate_age, sanitize_input, is_rate_limited
 from app.utils.ui_components import topbar
 from app.utils.styles import get_global_styles
 
-# ── CONFIGURATION ──
+# ── Page Config ──
 st.set_page_config(
     page_title="CivicGuide AI",
     page_icon="🗳️",
@@ -47,40 +37,22 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── CONSTANTS ──
+# ── Constants ──
 ELECTION_DATE = datetime(2026, 5, 20)
 LANG_OPTIONS = {
-    "English": "en", "Hindi (हिंदी)": "hi", "Kannada (ಕನ್ನಡ)": "kn",
-    "Tamil (தமிழ்)": "ta", "Telugu (తెలుగు)": "te", "Bengali (বাংলা)": "bn",
-    "Marathi (मराठी)": "mr", "Gujarati (ગુજરાતી)": "gu", "Punjabi (ಪੰਜਾਬಿ)": "pa",
-    "Malayalam (മലയാളം)": "ml", "Odia (ଓಡ଼ಿಶ)": "or", "Urdu (اردو)": "ur"
+    "English": "en", "हिंदी": "hi", "ಕನ್ನಡ": "kn", "తెలుగు": "te", "தமிழ்": "ta",
+    "മലയാളം": "ml", "বাংলা": "bn", "मराठी": "mr", "ગુજરાતી": "gu", "ਪੰਜਾਬੀ": "pa",
+    "ଓଡ଼ିଆ": "or", "اردو": "ur"
 }
 
-# ── SESSION STATE INIT ──
-_defaults = {
-    "user_data": None, "messages": [], "timeline_step": 0, "guide_step": 0,
-    "quiz_scores": [], "geo": None, "last_location": None, "stations": []
-}
-for k, v in _defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+# ── State Management ──
+if "user_data" not in st.session_state: st.session_state.user_data = None
+if "geo" not in st.session_state: st.session_state.geo = None
+if "detecting_gps" not in st.session_state: st.session_state.detecting_gps = False
+if "navigation_menu" not in st.session_state: st.session_state.navigation_menu = "Dashboard"
 
-# ── ACCESSIBILITY & SECURITY METADATA ──
-st.markdown("""
-    <script>
-        document.documentElement.lang = 'en';
-        const isHighContrast = window.localStorage.getItem('highContrast') === 'true';
-        document.documentElement.setAttribute('data-high-contrast', isHighContrast);
-    </script>
-    <head>
-        <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
-        <meta http-equiv="X-Content-Type-Options" content="nosniff">
-        <meta http-equiv="X-Frame-Options" content="DENY">
-    </head>
-    <div id="sr-announcer" role="status" aria-live="polite" style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;">
-        Application Loaded.
-    </div>
-""", unsafe_allow_html=True)
+# ── Accessibility Layer ──
+st.markdown('<div id="sr-announcer" role="status" aria-live="polite" style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;">Application Loaded.</div>', unsafe_allow_html=True)
 
 # ── GLOBAL CSS ──
 st.markdown('<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">', unsafe_allow_html=True)
@@ -95,7 +67,12 @@ with st.sidebar:
     target_lang = LANG_OPTIONS[selected_lang]
     def t(text: str) -> str: return translate_text(text, target_lang)
 
-    menu = st.radio("Navigation", ["Dashboard", "Journey", "Map", "AI Assistant", "Timeline", "Voting Guide", "Quiz", "Help Center"])
+    # Sync radio button with session state for programmatic switching
+    menu = st.radio(
+        "Navigation", 
+        ["Dashboard", "Journey", "Map", "AI Assistant", "Timeline", "Voting Guide", "Quiz", "Help Center"],
+        key="navigation_menu"
+    )
     
     st.markdown("---")
     high_contrast = st.toggle("High Contrast Mode")
@@ -105,15 +82,13 @@ with st.sidebar:
         st.info("CivicGuide AI processes all geospatial data in-memory and does not store permanent GPS logs.")
 
 # ── MAIN CONTENT ──
-
-# Calculate global variables for routes
 days_left = (ELECTION_DATE - datetime.now()).days
 countdown_display = f"{days_left}d"
 
 if menu == "Dashboard":
     render_dashboard(t, days_left, ELECTION_DATE, countdown_display)
 elif menu == "Journey":
-    journey_ui(st.session_state.user_data, target_lang, t, 0, 0, {})
+    journey_ui(st.session_state.user_data, target_lang, t, 12.9716, 77.5946, {}) # Defaults to Bengaluru if no geo
 elif menu == "Map":
     render_map_page(t, target_lang)
 elif menu == "AI Assistant":
@@ -126,5 +101,3 @@ elif menu == "Quiz":
     render_quiz(t)
 elif menu == "Help Center":
     render_help_center(t)
-
-st.markdown("</main>", unsafe_allow_html=True)
