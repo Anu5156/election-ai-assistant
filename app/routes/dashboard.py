@@ -26,6 +26,16 @@ def render_dashboard(t, days_left, election_date, countdown_display):
 
     render_metrics_row(t, countdown_display, election_date)
     
+    # ── GPS Logic ──
+    # We call this at the top level to ensure the JS eval has a chance to run.
+    # It will return None until the browser provides the coordinates.
+    current_geo = None
+    if st.session_state.get("detecting_gps", False):
+        current_geo = get_geolocation()
+        if current_geo:
+            st.session_state.geo = current_geo
+            st.session_state.detecting_gps = False # Stop the spinner/detection once found
+    
     # ── AI Strategy ──
     if st.session_state.user_data:
         user = st.session_state.user_data
@@ -41,17 +51,8 @@ def render_dashboard(t, days_left, election_date, countdown_display):
         "Voters": [120, 250, 450, 580, 420, 310, 280, 400, 520, 610, 490, 200]
     })
     
-    fig = px.area(
-        df, x="Hour", y="Voters",
-        title=t("Real-time Voter Turnout Estimate"),
-        color_discrete_sequence=["#22c55e"],
-        template="plotly_dark"
-    )
-    fig.update_layout(
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font_family="DM Sans", hovermode="x unified",
-        margin=dict(l=0, r=0, t=40, b=0), height=300
-    )
+    fig = px.area(df, x="Hour", y="Voters", title=t("Real-time Voter Turnout Estimate"), color_discrete_sequence=["#22c55e"], template="plotly_dark")
+    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_family="DM Sans", hovermode="x unified", margin=dict(l=0, r=0, t=40, b=0), height=300)
     fig.update_xaxes(showgrid=False)
     fig.update_yaxes(showgrid=True, gridcolor="rgba(30,48,80,0.5)")
     st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
@@ -61,29 +62,32 @@ def render_dashboard(t, days_left, election_date, countdown_display):
     st.markdown('<div class="cg-card">', unsafe_allow_html=True)
 
     age = st.number_input(t("Your Age"), min_value=0, max_value=120, step=1)
-    
-    if 0 < age < 18:
-        st.warning(t("You must be at least 18 years old to vote."))
-    elif age >= 18:
-        st.success(t("Great news! You are eligible to participate in the democratic process."))
+    if 0 < age < 18: st.warning(t("You must be at least 18 years old to vote."))
+    elif age >= 18: st.success(t("Great news! You are eligible to participate in the democratic process."))
 
     st.markdown(f"### 📍 {t('Location')}")
     col_gps1, col_gps2 = st.columns([1, 2])
     with col_gps1:
         if st.button("🛰️ " + t("Detect GPS")):
-            st.session_state.geo = get_geolocation()
+            st.session_state.detecting_gps = True
+            st.rerun()
     
     with col_gps2:
-        if st.session_state.geo: st.success(f"📡 {t('Live GPS Locked')}")
-        else: st.warning(f"📡 {t('GPS Not Used (Manual Mode)')}")
+        if st.session_state.get("geo"):
+            st.success(f"📡 {t('Live GPS Locked')}")
+        elif st.session_state.get("detecting_gps"):
+            st.info(f"⏳ {t('Fetching location... Please allow browser access.')}")
+        else:
+            st.warning(f"📡 {t('GPS Not Used (Manual Mode)')}")
 
-    geo = st.session_state.geo
+    geo = st.session_state.get("geo")
     if geo:
         lat, lng = geo["coords"]["latitude"], geo["coords"]["longitude"]
         location = f"{lat},{lng}"
         st.markdown(f'<div class="cg-card blue" style="border-left: 4px solid #3b82f6; margin-bottom: 20px;"><div style="font-size: 10px; font-family: \'DM Mono\', monospace; text-transform: uppercase; color: #3b82f6;">{t("Verified Live Location")}</div><div style="font-size: 18px; font-weight: 700; margin-top: 5px;">📍 {t("Coordinates Locked")}</div><div style="font-family: \'DM Mono\', monospace; font-size: 12px; color: #8ba3c4;">{round(lat,6)}, {round(lng,6)}</div></div>', unsafe_allow_html=True)
         if st.button("🔄 " + t("Reset & Use Manual Address")):
             st.session_state.geo = None
+            st.session_state.detecting_gps = False
             st.rerun()
     else:
         location = st.text_input(t("Enter current physical location"), placeholder="e.g. Ramanagara, Bengaluru")
