@@ -1,6 +1,6 @@
 """
 Maps Service - CivicGuide AI
-V2.2.0 - Hardened with Multi-Query Fallbacks
+V2.2.1 - Enhanced Reliability & Legacy Compatibility
 """
 import requests
 from app.config import GOOGLE_MAPS_API_KEY
@@ -42,7 +42,6 @@ def get_polling_stations(location: str, bias_lat: Optional[float] = None, bias_l
             "X-Goog-FieldMask": "places.displayName,places.formattedAddress,places.location,places.rating"
         }
         
-        # Broaden search with multiple queries to ensure results in all regions
         queries = [
             f"polling station near {location}, India",
             f"government school near {location}, India",
@@ -51,15 +50,12 @@ def get_polling_stations(location: str, bias_lat: Optional[float] = None, bias_l
         
         all_stations = []
         seen_names = set()
-        
         for q in queries:
             payload = {"textQuery": q}
             if lat and lng:
-                payload["locationBias"] = {"circle": {"center": {"latitude": lat, "longitude": lng}, "radius": 10000.0}} # 10km radius
-            
+                payload["locationBias"] = {"circle": {"center": {"latitude": lat, "longitude": lng}, "radius": 10000.0}}
             res = requests.post(url, json=payload, headers=headers, timeout=10)
             data = res.json()
-            
             for p in data.get("places", []):
                 name = p["displayName"]["text"]
                 if name not in seen_names:
@@ -71,7 +67,6 @@ def get_polling_stations(location: str, bias_lat: Optional[float] = None, bias_l
                         "rating": p.get("rating", 0.0)
                     })
                     seen_names.add(name)
-        
         return all_stations
     except Exception as e:
         print(f"PLACES API ERROR: {e}")
@@ -103,4 +98,6 @@ def calculate_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
     a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlng/2)**2
     return round(R * 2 * atan2(sqrt(a), sqrt(1-a)), 2)
 
+# ── Export Aliases (Legacy Support & New Standard) ──
 fetch_polling_stations = get_polling_stations
+load_stations = get_polling_stations # Restored for legacy compatibility
