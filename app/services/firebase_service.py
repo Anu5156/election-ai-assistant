@@ -1,6 +1,8 @@
 import os
+import json
 from datetime import datetime
 
+import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 from datetime import timezone
@@ -8,13 +10,19 @@ from datetime import timezone
 
 
 # ================================
-# 🔐 FIREBASE INIT
+# 🔐 FIREBASE INIT (LOCAL + CLOUD)
 # ================================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 KEY_PATH = os.path.join(BASE_DIR, "firebase_key.json")
 
 if not firebase_admin._apps:
-    cred = credentials.Certificate(KEY_PATH)
+    if os.path.exists(KEY_PATH):
+        # Local development — use the JSON file
+        cred = credentials.Certificate(KEY_PATH)
+    else:
+        # Streamlit Cloud — read from st.secrets
+        firebase_creds = dict(st.secrets["firebase"])
+        cred = credentials.Certificate(firebase_creds)
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
