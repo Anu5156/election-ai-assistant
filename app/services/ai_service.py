@@ -1,113 +1,120 @@
-import os
+"""
+AI Guidance Service - CivicGuide AI
+A hybrid decision-engine combining rule-based heuristics and Large Language Models.
+
+This service prioritizes fast, deterministic rule-based responses for common 
+queries (eligibility, documentation, voting hours) and falls back to 
+GPT-4o-mini for complex, natural language questions.
+"""
+
+import logging
+from typing import Any, Optional
 from openai import OpenAI
 from app.config import OPENAI_API_KEY
 
-# 🔥 keep your original client
+# ────────────── CONFIGURATION ──────────────
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Initialize OpenAI Client
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 
-def generate_guidance(user, query):
+def generate_guidance(user: Any, query: str) -> str:
+    """
+    Orchestrates the response logic for user queries.
+    Execution Flow: Heuristics -> Input Validation -> LLM Inference.
+    
+    Args:
+        user: The User model instance containing profile data.
+        query: The raw question string from the user.
+        
+    Returns:
+        A finalized response string.
+    """
+    if not query:
+        return "Please ask a question related to the election process."
+
     query_lower = query.lower().strip()
 
-    # =========================================================
-    # 🔥 1. RULE-BASED INTELLIGENCE (IMPROVED)
-    # =========================================================
+    # ────────────── 1. RULE-BASED DETERMINISTIC ENGINE ──────────────
+    # High-priority rules to ensure policy compliance and speed.
 
     if "who to vote" in query_lower or "whom to vote" in query_lower:
-        return "I cannot suggest a candidate. Please review policies and choose responsibly."
+        return (
+            "As an impartial assistant, I cannot suggest a candidate or party. "
+            "Please review the official manifestos and choose responsibly."
+        )
 
-    elif "eligible" in query_lower:
+    if "eligible" in query_lower:
         if user.age < 18:
-            return "You are not eligible to vote yet. You must be at least 18 years old."
-        else:
-            return "You are eligible to vote if you are registered in the voter list."
+            return "You are not eligible to vote yet. The legal voting age in India is 18."
+        return "You are eligible to vote if your name is present in the electoral roll."
 
-    elif "where" in query_lower or "polling station" in query_lower:
-        return f"You can find your nearest polling station in the map section for {user.location}."
+    if any(k in query_lower for k in ["where", "polling station", "polling booth"]):
+        return f"Your nearest polling station for {user.location} is displayed in the 'Map' and 'Journey' sections."
 
-    elif "polling booth" in query_lower:
-        return f"Your polling booth will be displayed on the map for {user.location}."
+    if any(k in query_lower for k in ["documents", "id proof", "voter id"]):
+        return (
+            "You must carry your Voter ID (EPIC). If not available, you can use "
+            "Aadhaar, Passport, Driving License, or other ECI-approved photo IDs."
+        )
 
-    elif "documents" in query_lower or "id" in query_lower:
-        return "Carry your Voter ID or any valid government ID proof like Aadhaar, Passport, etc."
+    if any(k in query_lower for k in ["time", "when", "hours"]):
+        return (
+            "Voting typically happens from 7:00 AM to 6:00 PM. \n\n"
+            "🟢 7 AM – 9 AM: Recommended (Low crowd)\n"
+            "🔴 12 PM – 3 PM: Peak hours (High crowd)\n"
+            "🟢 4 PM – 6 PM: Recommended (Moderate crowd)"
+        )
 
-    elif "time" in query_lower or "when" in query_lower:
-        return """
-Best time to vote:
+    if any(k in query_lower for k in ["register", "voter card", "apply"]):
+        return (
+            "Registration is done via the NVSP portal (voters.eci.gov.in). "
+            "You can use the 'Journey' tab in this app for a step-by-step guide."
+        )
 
-🟢 7 AM – Low crowd  
-🟡 11 AM – Moderate  
-🔴 2–4 PM – High crowd  
-🟢 After 5 PM – Low again
-"""
+    if "help" in query_lower:
+        return (
+            f"I can help you navigate the 2026 elections in {user.location}. "
+            "Ask me about registration, finding booths, or required documents."
+        )
 
-    elif "register" in query_lower or "not registered" in query_lower:
-        return "You can register through the NVSP portal or visit your nearest election office."
-
-    elif "help" in query_lower:
-        return f"""
-Here’s how I can help:
-
-📍 Find polling station near {user.location}
-🚗 Get navigation directions
-📅 Set voting reminders
-🗣️ Answer election questions
-"""
-
-    elif "how" in query_lower and "vote" in query_lower:
-        return f"""
-Here’s how you can vote:
-
-1. Go to your polling station near {user.location}
-2. Carry valid ID proof
-3. Verify your name in voter list
-4. Cast your vote using EVM
-"""
-
-    # =========================================================
-    # 🔁 2. SMART FALLBACK (BEFORE OPENAI)
-    # =========================================================
+    # ────────────── 2. VALIDATION & FALLBACK ──────────────
 
     if len(query_lower) < 3:
-        return "Please ask a clear question related to voting."
+        return "Please ask a more specific question related to the election."
 
-    # =========================================================
-    # 🔥 3. OPENAI (ORIGINAL LOGIC RETAINED)
-    # =========================================================
+    # ────────────── 3. GENERATIVE AI INFERENCE (LLM) ──────────────
+    # Used for complex reasoning and natural language understanding.
 
     try:
-        prompt = f"""
-You are an intelligent election assistant.
-
-User:
-- Age: {user.age}
-- Location: {user.location}
-- Registered: {user.is_registered}
-
-Instructions:
-- Give simple explanations
-- Provide step-by-step guidance
-- Be clear and helpful
-- Avoid political bias
-
-User Question: {query}
-"""
+        system_prompt = (
+            "You are an intelligent, non-partisan election assistant for CivicGuide AI. "
+            "Provide clear, concise, and helpful guidance based on the user's profile."
+        )
+        
+        user_context = (
+            f"Voter Profile:\n- Age: {user.age}\n- Location: {user.location}\n"
+            f"- Registration Status: {'Registered' if user.is_registered else 'Unregistered'}\n\n"
+            f"Question: {query}"
+        )
 
         response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_context}
+            ],
+            max_tokens=250,
+            temperature=0.7
         )
 
-        return response.choices[0].message.content
-
-    # =========================================================
-    # 🔥 4. FAIL-SAFE (VERY IMPORTANT)
-    # =========================================================
+        return response.choices[0].message.content or "I'm sorry, I couldn't generate a response."
 
     except Exception as e:
-        print("AI ERROR:", e)
-
+        logger.error(f"AI Service Inference Error: {e}")
         return (
-            "AI service is temporarily unavailable. "
-            "Please visit the official election website or your nearest polling office."
+            "Our AI reasoning engine is currently at capacity. "
+            "Please refer to the 'Journey' tab for standard election procedures."
         )

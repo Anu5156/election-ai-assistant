@@ -10,7 +10,6 @@ def test_db_none_safety_guards():
     assert firebase_service.get_vote_counts() == {}
     assert firebase_service.get_crowd_data() == {}
     assert firebase_service.get_booth_crowd() == {}
-    assert firebase_service.get_live_queue() == {}
     assert firebase_service.get_detailed_votes() == []
     
     # These should just return (void) without crashing

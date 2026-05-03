@@ -1,195 +1,207 @@
+"""
+Firebase Service Module - CivicGuide AI
+Handles real-time data persistence, crowd tracking, and election analytics.
+
+This module provides a secure, fail-safe connection to Google Cloud Firestore.
+It automatically handles authentication for both local development (via service account JSON)
+and Streamlit Cloud production (via st.secrets).
+"""
+
 import os
 import json
-from datetime import datetime
+import logging
+from datetime import datetime, timezone, timedelta
+from typing import Dict, List, Any, Optional
 
 import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
-from datetime import timezone
 
+# ────────────── CONFIGURATION ──────────────
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# ================================
-# 🔐 FIREBASE INIT (LOCAL + CLOUD)
-# ================================
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 KEY_PATH = os.path.join(BASE_DIR, "firebase_key.json")
 
-db = None  # Default to None
+db: Optional[firestore.client] = None
 
+# ────────────── INITIALIZATION ──────────────
 try:
     if not firebase_admin._apps:
         if os.path.exists(KEY_PATH):
+            # 🏠 Local initialization
             cred = credentials.Certificate(KEY_PATH)
         elif "firebase" in st.secrets:
+            # ☁️ Cloud initialization (Streamlit Secrets)
             import tempfile
             key_dict = dict(st.secrets["firebase"])
-            tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
-            json.dump(key_dict, tmp)
-            tmp.close()
-            cred = credentials.Certificate(tmp.name)
+            # Firebase SDK expects a file path or a dict with specific formatting
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as tmp:
+                json.dump(key_dict, tmp)
+                tmp_path = tmp.name
+            cred = credentials.Certificate(tmp_path)
         else:
-            raise FileNotFoundError("No Firebase credentials found")
+            raise FileNotFoundError("Missing Firebase configuration (JSON or Secrets)")
+            
         firebase_admin.initialize_app(cred)
+        
     db = firestore.client()
-    print("✅ Firebase connected successfully")
+    logger.info("✅ Firebase connection established successfully")
 except Exception as e:
-    print(f"⚠️ Firebase unavailable ({e}). Using mock data.")
+    logger.warning(f"⚠️ Firebase initialization failed: {e}. Falling back to mock/local mode.")
     db = None
 
 
-# ================================
-# 🗳️ SUBMIT VOTE
-# ================================
-def submit_vote(candidate, location="unknown"):
+# ────────────── CORE SERVICES ──────────────
+
+def submit_vote(candidate: str, location: str = "unknown") -> None:
     """
-    Stores vote in Firestore with extra metadata
+    Records a vote event with geospatial and temporal metadata.
+    
+    Args:
+        candidate: Name of the candidate or party.
+        location: The user's area or polling booth name.
     """
     if db is None:
         return
+
     try:
         db.collection("votes").add({
             "candidate": candidate,
             "location": location,
-            "timestamp": datetime.now(timezone.utc) 
+            "timestamp": datetime.now(timezone.utc)
         })
     except Exception as e:
-        print("Vote submit error:", e)
+        logger.error(f"Error submitting vote: {e}")
 
 
-# ================================
-# 📊 GET VOTE COUNTS
-# ================================
-def get_vote_counts():
+def get_vote_counts() -> Dict[str, int]:
     """
-    Returns total votes per candidate
+    Aggregates total votes per candidate from Firestore.
+    
+    Returns:
+        A dictionary mapping candidate names to vote tallies.
     """
     if db is None:
         return {}
-    counts = {}
 
+    counts: Dict[str, int] = {}
     try:
         docs = db.collection("votes").stream()
-
         for d in docs:
             data = d.to_dict()
             candidate = data.get("candidate", "Unknown")
-
             counts[candidate] = counts.get(candidate, 0) + 1
-
     except Exception as e:
-        print("Firestore error:", e)
+        logger.error(f"Error fetching vote counts: {e}")
 
     return counts
 
 
-# ================================
-# 📡 CROWD DATA (LOCATION BASED)
-# ================================
-def get_crowd_data():
+def get_crowd_data() -> Dict[str, int]:
     """
-    Returns number of voters per location
+    Calculates the distribution of voters across various locations.
+    
+    Returns:
+        A dictionary mapping locations to the number of active voters.
     """
     if db is None:
         return {}
-    crowd = {}
 
+    crowd: Dict[str, int] = {}
     try:
         docs = db.collection("votes").stream()
-
         for d in docs:
             data = d.to_dict()
             loc = data.get("location", "unknown")
-
             crowd[loc] = crowd.get(loc, 0) + 1
-
     except Exception as e:
-        print("Crowd fetch error:", e)
+        logger.error(f"Error fetching crowd data: {e}")
 
     return crowd
 
 
-# ================================
-# 📈 ADVANCED ANALYTICS (OPTIONAL)
-# ================================
-def get_detailed_votes():
+def get_booth_crowd() -> Dict[str, int]:
     """
-    Returns full vote records (for dashboards / ML)
+    Returns live crowd density (votes within the last 30 minutes) per booth.
+    This is used for real-time traffic estimation.
+    
+    Returns:
+        A dictionary of booth names and their recent voter count.
+    """
+    if db is None:
+        return {}
+
+    now = datetime.now(timezone.utc)
+    crowd: Dict[str, int] = {}
+    
+    try:
+        # Optimization: In production, use a Firestore Query to filter by timestamp
+        docs = db.collection("votes").stream()
+        for d in docs:
+            data = d.to_dict()
+            loc = data.get("location", "unknown")
+            ts = data.get("timestamp")
+
+            if ts:
+                # Ensure timezone awareness for comparison
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+
+                # Count only if within last 30 minutes (1800 seconds)
+                if (now - ts).total_seconds() < 1800:
+                    crowd[loc] = crowd.get(loc, 0) + 1
+    except Exception as e:
+        logger.error(f"Error calculating booth crowd: {e}")
+
+    return crowd
+
+
+def submit_verification(voter_qr: str, is_authentic: bool) -> None:
+    """
+    Logs ID verification attempts for security auditing.
+    
+    Args:
+        voter_qr: The scanned QR code data (obfuscated in production).
+        is_authentic: Result of the AI-powered authenticity check.
+    """
+    if db is None:
+        return
+
+    try:
+        db.collection("verification_logs").add({
+            "voter_qr": voter_qr,
+            "is_authentic": is_authentic,
+            "timestamp": datetime.now(timezone.utc)
+        })
+    except Exception as e:
+        logger.error(f"Error logging verification: {e}")
+
+
+def get_detailed_votes() -> List[Dict[str, Any]]:
+    """
+    Retrieves the full dataset of votes for analytical visualization.
+    
+    Returns:
+        A list of raw dictionary records from the 'votes' collection.
     """
     if db is None:
         return []
-    records = []
 
     try:
         docs = db.collection("votes").stream()
-
-        for d in docs:
-            records.append(d.to_dict())
-
+        return [d.to_dict() for d in docs]
     except Exception as e:
-        print("Detailed fetch error:", e)
+        logger.error(f"Error fetching detailed votes: {e}")
+        return []
 
-    return records
 
-def submit_verification(voter_qr, is_authentic):
-    if db is None:
-        return
-    db.collection("verification_logs").add({
-        "voter_qr": voter_qr,
-        "is_authentic": is_authentic,
-        "timestamp": datetime.utcnow()
-    })
-
-def get_live_queue():
-    if db is None:
-        return {}
-    docs = db.collection("votes").stream()
-    now = datetime.utcnow()
-
-    queue = {}
-
-    for d in docs:
-        data = d.to_dict()
-        loc = data.get("location", "unknown")
-        ts = data.get("timestamp")
-
-        if ts and (now - ts).seconds < 1800:
-            queue[loc] = queue.get(loc, 0) + 1
-
-    return queue
-
-def get_booth_crowd():
-    if db is None:
-        return {}
-    from datetime import datetime, timezone
-    docs = db.collection("votes").stream()
-    now = datetime.now(timezone.utc)
-
-    crowd = {}
-
-    for d in docs:
-        data = d.to_dict()
-        loc = data.get("location", "unknown")
-        ts = data.get("timestamp")
-
-        if ts:
-            # 🔥 Ensure ts is timezone-aware
-            if ts.tzinfo is None:
-                ts = ts.replace(tzinfo=timezone.utc)
-
-            if (now - ts).total_seconds() < 1800:
-                crowd[loc] = crowd.get(loc, 0) + 1
-
-    return crowd
-
-def get_live_analytics():
-    if db is None:
-        return {}
-    docs = db.collection("votes").stream()
-
-    counts = {}
-    for d in docs:
-        data = d.to_dict()
-        candidate = data.get("candidate", "Unknown")
-        counts[candidate] = counts.get(candidate, 0) + 1
-
+def get_live_analytics() -> Dict[str, int]:
+    """
+    Interface for live polling analytics.
+    
+    Returns:
+        Current global vote distribution.
+    """
     return get_vote_counts()
