@@ -4,6 +4,7 @@ Contains reusable Streamlit-based UI elements and CSS-in-JS components.
 """
 
 import streamlit as st
+import textwrap
 from typing import List, Tuple, Optional
 from datetime import datetime
 
@@ -11,7 +12,7 @@ def metric_card(label: str, value: str, sub: str, badge: str, badge_cls: str, ba
     """
     Generates a high-fidelity metric card with ARIA accessibility.
     """
-    return f"""
+    return textwrap.dedent(f"""
     <div class="metric-card" role="region" aria-label="{label} metric">
       <div class="top-bar" style="background:linear-gradient(90deg,{bar_color},transparent 70%)"></div>
       <div class="m-label">{label}</div>
@@ -19,7 +20,7 @@ def metric_card(label: str, value: str, sub: str, badge: str, badge_cls: str, ba
       <div class="m-sub">{sub}</div>
       <div class="badge {badge_cls}" role="status">{badge}</div>
     </div>
-    """
+    """)
 
 def render_metrics_row(t_func, countdown_display: str, election_date: datetime):
     """
@@ -44,10 +45,12 @@ def topbar(title: str, chips: Optional[List[Tuple[str, str]]] = None):
         chip_html += f'<span class="cg-chip {extra_cls}">{label}</span> '
     
     st.markdown(
-        f"""<div class="cg-topbar">
+        textwrap.dedent(f"""
+        <div class="cg-topbar">
           <div class="cg-page-title">{title}</div>
           <div style="display:flex;gap:8px;align-items:center">{chip_html}</div>
-        </div>""",
+        </div>
+        """),
         unsafe_allow_html=True,
     )
 

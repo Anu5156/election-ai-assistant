@@ -3,11 +3,13 @@ Styles Module - CivicGuide AI
 Contains the global CSS and design tokens for the premium dark civic aesthetic.
 """
 
+import textwrap
+
 def get_global_styles() -> str:
     """
     Returns the comprehensive CSS string for the application.
     """
-    return """
+    return textwrap.dedent("""
     <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700&family=DM+Sans:wght@400;500&family=DM+Mono&display=swap" rel="stylesheet">
     <style>
     /* ── Reset & Base ── */
@@ -72,4 +74,4 @@ def get_global_styles() -> str:
     .jnode-active { background: #3b82f6; color: white; border: 2px solid #0d1828; }
     .jnode-pending { background: #1e3050; color: #4d6585; }
     </style>
-    """
+    """)
