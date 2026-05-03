@@ -20,11 +20,25 @@ if not firebase_admin._apps:
         # Local development — use the JSON file
         cred = credentials.Certificate(KEY_PATH)
     else:
-        # Streamlit Cloud — read from st.secrets
-        key_dict = json.loads(json.dumps(dict(st.secrets["firebase"])))
-        # Fix escaped newlines in private_key
-        key_dict["private_key"] = key_dict["private_key"].replace("\\n", "\n")
-        cred = credentials.Certificate(key_dict)
+        # Streamlit Cloud — write secrets to a temp file
+        import tempfile
+        key_dict = {
+            "type": st.secrets["firebase"]["type"],
+            "project_id": st.secrets["firebase"]["project_id"],
+            "private_key_id": st.secrets["firebase"]["private_key_id"],
+            "private_key": st.secrets["firebase"]["private_key"],
+            "client_email": st.secrets["firebase"]["client_email"],
+            "client_id": st.secrets["firebase"]["client_id"],
+            "auth_uri": st.secrets["firebase"]["auth_uri"],
+            "token_uri": st.secrets["firebase"]["token_uri"],
+            "auth_provider_x509_cert_url": st.secrets["firebase"]["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": st.secrets["firebase"]["client_x509_cert_url"],
+        }
+        # Write to temp file
+        tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False)
+        json.dump(key_dict, tmp)
+        tmp.close()
+        cred = credentials.Certificate(tmp.name)
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
