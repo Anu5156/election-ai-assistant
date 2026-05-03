@@ -8,6 +8,9 @@ from app.utils.ui_components import topbar
 from app.services.gemini_service import get_gemini_response
 
 def render_quiz(t):
+    # ✅ FIX: Initialize session state
+    if "quiz_scores" not in st.session_state:
+        st.session_state.quiz_scores = []
     """
     Renders the Election Quiz page.
     """
