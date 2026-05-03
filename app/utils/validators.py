@@ -2,6 +2,7 @@ import time
 import streamlit as st
 import re
 from typing import List
+import os
 
 # ────────────── SECURITY CONFIG ──────────────
 MAX_INPUT_LENGTH = 500
