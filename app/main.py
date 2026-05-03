@@ -18,7 +18,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app.services.maps_service import get_polling_stations, geocode_location
 from app.services.translate_service import translate_text
 from app.services.calendar_service import generate_calendar_link
-from app.utils.validators import validate_age
+from app.utils.validators import validate_age, sanitize_input, is_rate_limited
 from app.routes.journey import journey_ui
 from app.models.user import User
 from streamlit_js_eval import get_geolocation
@@ -103,7 +103,7 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# 🌍 ACCESSIBILITY & SEO METADATA
+# 🌍 ACCESSIBILITY, SEO & SECURITY METADATA
 st.markdown("""
     <script>
         document.documentElement.lang = 'en';
@@ -113,6 +113,10 @@ st.markdown("""
         <meta name="keywords" content="election, voting, india, polling station, civic guide, voter assistance">
         <meta property="og:title" content="CivicGuide AI">
         <meta property="og:description" content="Your intelligent companion for a frictionless voting experience.">
+        <!-- 🛡️ SECURITY HEADERS -->
+        <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+        <meta http-equiv="X-Content-Type-Options" content="nosniff">
+        <meta http-equiv="X-Frame-Options" content="DENY">
     </head>
     <a href="#main-content" class="skip-link" style="position:absolute; left:-10000px; top:auto; width:1px; height:1px; overflow:hidden;">
         Skip to main content
@@ -1588,13 +1592,17 @@ elif menu == "AI Assistant":
         st.session_state.messages.append({"role": "user", "content": prompt})
 
         with st.chat_message("assistant"):
-            with st.spinner(t("Analyzing and generating response...")):
-                # Pass history for context
-                response = get_gemini_response(prompt, history=st.session_state.messages[-5:])
-                st.markdown(response)
-        
-        # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response})
+            if is_rate_limited():
+                st.warning("⚠️ Slow down! Please wait a moment between questions.")
+            elif not sanitize_input(prompt):
+                st.error("🚨 Suspicious activity detected. Your query has been blocked for safety.")
+            else:
+                with st.spinner(t("Analyzing and generating response...")):
+                    # Pass history for context
+                    response = get_gemini_response(prompt, history=st.session_state.messages[-5:])
+                    st.markdown(response)
+                    # Add assistant response to chat history
+                    st.session_state.messages.append({"role": "assistant", "content": response})
 
     if st.button(t("Clear Conversation")):
         st.session_state.messages = []
