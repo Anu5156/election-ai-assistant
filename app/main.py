@@ -4,7 +4,7 @@ import os
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.services.maps_service import get_polling_stations
+from app.services.maps_service import get_polling_stations, geocode_location
 from app.services.translate_service import translate_text
 from app.services.calendar_service import generate_calendar_link
 from app.utils.validators import validate_age
@@ -14,9 +14,21 @@ from streamlit_js_eval import get_geolocation
 from app.services.maps_service import get_route_details
 from streamlit_folium import st_folium
 from app.services.firebase_service import get_booth_crowd
-from app.services.gemini_service import get_gemini_response
+from app.services.gemini_service import get_gemini_response, get_ai_strategy
 import time
 import urllib.parse
+from datetime import datetime
+import plotly.express as px
+import pandas as pd
+import numpy as np
+
+# ─────────────────────────────────────────
+# REAL-TIME CONFIG
+# ─────────────────────────────────────────
+ELECTION_DATE = datetime(2026, 5, 5)
+now = datetime.now()
+days_left = (ELECTION_DATE - now).days
+countdown_display = f"{days_left}d" if days_left > 0 else "Today"
 
 
 st.markdown("""
@@ -99,6 +111,7 @@ _defaults = {
     "geo": None,
     "quiz_scores": [],
     "quiz_attempts": 0,
+    "messages": [], # For AI Chat
 }
 # =========================
 # SESSION STATE INIT
@@ -139,13 +152,19 @@ st.markdown(
 
     /* ── Card component ── */
     .cg-card {
-        background: #0d1828;
-        border: 1px solid #1e3050;
-        border-radius: 14px;
-        padding: 22px 24px;
-        margin-bottom: 18px;
-        position: relative;
-        overflow: hidden;
+        background: rgba(13, 24, 40, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(30, 48, 80, 0.5);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 20px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .cg-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        border-color: rgba(59, 130, 246, 0.4);
     }
     .cg-card::before {
         content: '';
@@ -162,16 +181,22 @@ st.markdown(
     .metric-grid {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 14px;
+        gap: 16px;
         margin-bottom: 24px;
     }
     .metric-card {
-        background: #0d1828;
-        border: 1px solid #1e3050;
-        border-radius: 12px;
-        padding: 18px 20px;
+        background: rgba(13, 24, 40, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(30, 48, 80, 0.5);
+        border-radius: 14px;
+        padding: 20px;
         position: relative;
         overflow: hidden;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .metric-card:hover {
+        background: rgba(22, 37, 64, 0.8);
+        border-color: rgba(34, 197, 94, 0.4);
     }
     .metric-card .top-bar {
         position: absolute;
@@ -399,6 +424,30 @@ st.markdown(
         margin-right:5px; vertical-align:middle;
     }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    /* ── Animated Buttons ── */
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px !important;
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+        color: #e2eaf5 !important;
+        border: 1px solid rgba(148, 163, 184, 0.2) !important;
+        padding: 12px 24px !important;
+        transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1) !important;
+        font-family: 'DM Sans', sans-serif !important;
+        font-weight: 500 !important;
+    }
+    .stButton>button:hover {
+        background: linear-gradient(135deg, #334155 0%, #1e293b 100%) !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4) !important;
+        transform: translateY(-2px);
+    }
+
+    .cg-divider {
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(30, 48, 80, 0.8), transparent);
+        margin: 32px 0;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -418,7 +467,7 @@ with st.sidebar:
                background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);
                border-radius:6px;padding:3px 10px;font-family:'DM Mono',monospace;
                font-size:11px;color:#22c55e">
-            <span class="live-dot"></span> Live Session
+            <span class="live-dot"></span> Live Session • {now.strftime('%H:%M:%S')}
           </div>
         </div>
         """,
@@ -477,10 +526,10 @@ def metric_card(label: str, value: str, sub: str, badge: str, badge_cls: str, ba
 def render_metrics_row():
     html = f"""
     <div class="metric-grid">
-      {metric_card("Registration", "✓", "Voter ID verified", "Active", "badge-green", "#22c55e")}
-      {metric_card("Stations Nearby", "3", "Within 2 km radius", "Mapped", "badge-blue", "#3b82f6")}
-      {metric_card("Crowd Level", "Low", "Best time: 9–11 AM", "Updated", "badge-amber", "#f59e0b")}
-      {metric_card("Election Countdown", "12d", "May 5, 2026", "Lok Sabha", "badge-red", "#ef4444")}
+      {metric_card(t("Registration"), "✓", t("Voter ID verified"), t("Active"), "badge-green", "#22c55e")}
+      {metric_card(t("Stations Nearby"), "3", t("Within 2 km radius"), t("Mapped"), "badge-blue", "#3b82f6")}
+      {metric_card(t("Crowd Level"), t("Low"), t("Best time: 9–11 AM"), t("Updated"), "badge-amber", "#f59e0b")}
+      {metric_card(t("Election Countdown"), countdown_display, t(ELECTION_DATE.strftime('%B %d, %Y')), t("Lok Sabha"), "badge-red", "#ef4444")}
     </div>
     """
 
@@ -488,12 +537,15 @@ def render_metrics_row():
 
 
 def render_journey_steps():
+    user = st.session_state.user_data
+    is_reg = user.is_registered if user else False
+    
     steps = [
-        ("done",    "✓", "Register to Vote",         "Voter ID obtained · EPIC card issued"),
-        ("done",    "✓", "Verify your details",       "Name, photo & address confirmed"),
-        ("active",  "→", "Find your polling booth",   "Use location finder · Confirm booth no."),
-        ("pending", "○", "Collect voter slip",         "From BLO or voters.eci.gov.in"),
-        ("pending", "○", "Cast your vote",             "Carry EPIC + one more ID on poll day"),
+        ("done" if is_reg else "active", "✓" if is_reg else "→", t("Register to Vote"), t("Voter ID obtained · EPIC card issued")),
+        ("done" if is_reg else "pending", "✓" if is_reg else "○", t("Verify your details"), t("Name, photo & address confirmed")),
+        ("active" if is_reg else "pending", "→" if is_reg else "○", t("Find your polling booth"), t("Use location finder · Confirm booth no.")),
+        ("pending", "○", t("Collect voter slip"), t("From BLO or voters.eci.gov.in")),
+        ("pending", "○", t("Cast your vote"), t("Carry EPIC + one more ID on poll day")),
     ]
     rows = ""
     for state, icon, title, desc in steps:
@@ -527,10 +579,58 @@ def topbar(title: str, chips: list[tuple[str, str]] = None):
 if menu == "Dashboard":
     topbar(
         "📊 " + t("Dashboard"),
-        [("Election in 12 days", "cg-chip-amber"), ("Bengaluru, KA", "")],
+        [(f"{t('Election in')} {days_left} {t('days')}", "cg-chip-amber"), ("Bengaluru, KA", "")],
     )
 
     render_metrics_row()
+    
+    # ─────────────────────────────────────────
+    # ✨ AI STRATEGY (NEW - FAANG LEVEL)
+    # ─────────────────────────────────────────
+    if st.session_state.user_data:
+        user = st.session_state.user_data
+        st.markdown(f"### ✨ {t('Your Personalized Strategy')}")
+        with st.container():
+            strategy = get_ai_strategy(user.age, user.location, user.voting_location, user.is_registered)
+            st.markdown(f"""
+            <div class="cg-card blue" style="border-left: 4px solid #3b82f6;">
+                <div style="display: flex; align-items: flex-start; gap: 15px;">
+                    <div style="font-size: 24px;">🤖</div>
+                    <div style="font-style: italic; color: #e2eaf5;">{strategy}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # ─────────────────────────────────────────
+    # 📈 LIVE ANALYTICS (NEW - FAANG LEVEL)
+    # ─────────────────────────────────────────
+    st.markdown(f"### 📈 {t('Live Participation Trends')}")
+    
+    # Mock data for FAANG-level visualization
+    df = pd.DataFrame({
+        "Hour": ["7 AM", "8 AM", "9 AM", "10 AM", "11 AM", "12 PM", "1 PM", "2 PM", "3 PM", "4 PM", "5 PM", "6 PM"],
+        "Voters": [120, 250, 450, 580, 420, 310, 280, 400, 520, 610, 490, 200],
+        "Capacity": [800] * 12
+    })
+    
+    fig = px.area(
+        df, x="Hour", y="Voters",
+        title=t("Real-time Voter Turnout Estimate"),
+        color_discrete_sequence=["#22c55e"],
+        template="plotly_dark"
+    )
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font_family="DM Sans",
+        hovermode="x unified",
+        margin=dict(l=0, r=0, t=40, b=0),
+        height=300
+    )
+    fig.update_xaxes(showgrid=False)
+    fig.update_yaxes(showgrid=True, gridcolor="rgba(30,48,80,0.5)")
+    
+    st.plotly_chart(fig, width='stretch', config={'displayModeBar': False})
 
     st.markdown(
         "<h3 style='margin-bottom:14px'>🧑 " + t("Your Voter Profile") + "</h3>",
@@ -558,13 +658,31 @@ if menu == "Dashboard":
             """,
             unsafe_allow_html=True,
         )
+    elif age >= 18:
+        st.toast(t("You are eligible to vote!"), icon="✅")
+        st.markdown(
+            f"""
+            <div class="alert alert-success">
+            ✅ {t("Great news! You are eligible to participate in the democratic process.")}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     # 📍 LOCATION (NOW BELOW AGE)
     st.markdown(f"### 📍 {t('Location')}")
 
     # Detect GPS
-    if st.button("📍 " + t("Detect My Location")):
-        st.session_state.geo = get_geolocation()
+    col_gps1, col_gps2 = st.columns([1, 2])
+    with col_gps1:
+        if st.button("🛰️ " + t("Detect GPS")):
+            st.session_state.geo = get_geolocation()
+    
+    with col_gps2:
+        if st.session_state.geo:
+            st.success(f"📡 {t('Live GPS Locked')}")
+        else:
+            st.warning(f"📡 {t('GPS Not Used (Manual Mode)')}")
 
     geo = st.session_state.geo
 
@@ -574,14 +692,22 @@ if menu == "Dashboard":
         location = f"{lat},{lng}"
 
         st.markdown(
-            f'<div class="alert alert-success">✓ {t("Detected")}: {round(lat,4)}, {round(lng,4)}</div>',
+            f'<div class="alert alert-success">✓ {t("Live Coordinates Found")}: {round(lat,4)}, {round(lng,4)}</div>',
             unsafe_allow_html=True,
         )
     else:
         location = st.text_input(
-            t("Enter location manually"),
-            placeholder="e.g. Koramangala, Bengaluru"
+            t("Enter current physical location"),
+            placeholder="e.g. Ramanagara, Bengaluru",
+            help=t("Type where you are RIGHT NOW for accurate distance calculation.")
         )
+    
+    voting_loc = st.text_input(
+        t("Voting Constituency / Area (Optional)"),
+        placeholder=t("Enter your registered voting area if different"),
+        help=t("If left blank, we'll use your current location to find booths.")
+    )
+
     registered = st.checkbox(t("I am registered to vote"))
 
     if st.button(t("🚀 Start My Journey"),disabled=(age<18)):
@@ -598,8 +724,22 @@ if menu == "Dashboard":
                 unsafe_allow_html=True,
             )
         else:
+            lat_val = None
+            lng_val = None
+            if st.session_state.geo:
+                lat_val = st.session_state.geo["coords"]["latitude"]
+                lng_val = st.session_state.geo["coords"]["longitude"]
+            else:
+                # Try geocoding the manual address input
+                lat_val, lng_val = geocode_location(location)
+
             st.session_state.user_data = User(
-                age=age, location=location, is_registered=registered
+                age=age, 
+                location=location, 
+                voting_location=voting_loc if voting_loc.strip() else location,
+                is_registered=registered,
+                latitude=lat_val,
+                longitude=lng_val
             )
             st.markdown(
                 f'<div class="alert alert-success">✓ {t("Profile saved. Head to Journey →")}</div>',
@@ -704,19 +844,28 @@ elif menu == "Journey":
         st.warning("Complete profile first")
         st.stop()
 
-    location = user.location
+    search_loc = user.voting_location if user.voting_location else user.location
 
-    if st.session_state.last_location != location:
-        st.session_state.stations = load_stations(location)
-        st.session_state.last_location = location
+    if st.session_state.last_location != search_loc:
+        st.session_state.stations = load_stations(search_loc)
+        st.session_state.last_location = search_loc
 
     stations = st.session_state.stations
+    location = user.location # Physical location for distance ref
 
-    if "," in location:
-        base_lat, base_lng = map(float, location.split(","))
+    if user.latitude and user.longitude:
+        base_lat, base_lng = user.latitude, user.longitude
+    elif "," in location:
+        try:
+            base_lat, base_lng = map(float, location.split(","))
+        except:
+            base_lat, base_lng = geocode_location(location)
     else:
-        base_lat = stations[0]["lat"]
-        base_lng = stations[0]["lng"]
+        base_lat, base_lng = geocode_location(location)
+        
+    # Final fallback if geocoding failed
+    if base_lat is None:
+        base_lat, base_lng = stations[0]["lat"], stations[0]["lng"]
 
 
     crowd_data = get_booth_crowd() or {}
@@ -726,10 +875,19 @@ elif menu == "Journey":
         key=lambda s: score_booth_map(s, base_lat, base_lng, crowd_data)
     )
 
-    st.markdown("### 🧠 AI Recommendation")
-    st.success(f"⭐ Best Booth: {best_booth['name']}")
+    st.markdown(f"### 🧠 {t('AI Recommendation')}")
+    st.success(f"⭐ **{t('Best Booth')}: {best_booth['name']}**")
 
     crowd_val = crowd_data.get(best_booth["name"], 0)
+    dist_to_best = calculate_distance(base_lat, base_lng, best_booth["lat"], best_booth["lng"])
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**📏 {t('Distance')}:** {dist_to_best} km")
+        if dist_to_best < 0.1:
+            st.info(f"🚶 {t('Extremely close! Walking is recommended.')}")
+    with col2:
+        st.markdown(f"**👥 {t('Crowd Estimate')}:** {crowd_val} {t('people')}")
 
     if crowd_val < 30:
         st.success("🟢 Low crowd — best time to go now")
@@ -746,7 +904,7 @@ elif menu == "Journey":
 
     # 📍 MAP + STATIONS
     st.markdown(f"<h3>{t('Nearby Polling Stations')}</h3>", unsafe_allow_html=True)
-    journey_ui(location, target_lang, t)
+    journey_ui(location, target_lang, t, base_lat, base_lng)
 
 # ─────────────────────────────────────────
 # PAGE — MAP (UNCHANGED BUT CLEAR PURPOSE)
@@ -761,22 +919,32 @@ elif menu == "Map":
         st.warning("Please complete profile first")
         st.stop()
 
-    location = st.session_state.user_data.location
-
-    if not location:
+    user_data = st.session_state.user_data
+    location = user_data.location # physical
+    search_loc = user_data.voting_location if user_data.voting_location else location
+    
+    if not search_loc:
         st.warning("Please enter location first")
         st.stop()
 
     # ================================
     # 📍 FETCH STATIONS (UNCHANGED)
     # ================================
-    stations = load_stations(location)
+    stations = load_stations(search_loc)
 
-    if "," in location:
-        base_lat, base_lng = map(float, location.split(","))
+    user_data = st.session_state.user_data
+    if user_data.latitude and user_data.longitude:
+        base_lat, base_lng = user_data.latitude, user_data.longitude
+    elif "," in location:
+        try:
+            base_lat, base_lng = map(float, location.split(","))
+        except:
+            base_lat, base_lng = geocode_location(location)
     else:
-        base_lat = stations[0]["lat"]
-        base_lng = stations[0]["lng"]
+        base_lat, base_lng = geocode_location(location)
+
+    if base_lat is None:
+        base_lat, base_lng = stations[0]["lat"], stations[0]["lng"]
 
 
     # ================================
@@ -1321,21 +1489,40 @@ elif menu == "Quiz":
 # 🤖 AI ASSISTANT PAGE
 # ================================
 elif menu == "AI Assistant":
-    topbar("🤖 AI Election Assistant")
+    topbar("🤖 " + t("AI Election Assistant"), [("Live AI", "badge-green")])
 
-    st.markdown("## Ask anything about elections")
+    st.markdown(f"## {t('Ask anything about elections')}")
 
-    user_q = st.text_input("Type your question")
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-    if st.button("Get Answer"):
-        if user_q:
-            with st.spinner("Thinking..."):
-                answer = get_gemini_response(user_q)
+    # Display chat messages from history on app rerun
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
 
-                if answer:
-                    st.success(answer)
-                else:
-                    st.warning("No response from AI")
+    # React to user input
+    if prompt := st.chat_input(t("What would you like to know?")):
+        # Display user message in chat message container
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": prompt})
+
+        with st.chat_message("assistant"):
+            with st.spinner(t("Analyzing and generating response...")):
+                # Pass history for context
+                response = get_gemini_response(prompt, history=st.session_state.messages[-5:])
+                st.markdown(response)
+        
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
+    if st.button(t("Clear Conversation")):
+        st.session_state.messages = []
+        st.rerun()
 
 
 

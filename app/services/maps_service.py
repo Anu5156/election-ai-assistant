@@ -6,8 +6,16 @@ import streamlit as st
 # ---------------- GEOCODING ----------------
 def geocode_location(location):
     try:
-        url = "https://maps.googleapis.com/maps/api/geocode/json"
+        # If it's already a lat,lng string, return it
+        if "," in location:
+            parts = location.split(",")
+            if len(parts) == 2:
+                try:
+                    return float(parts[0].strip()), float(parts[1].strip())
+                except:
+                    pass
 
+        url = "https://maps.googleapis.com/maps/api/geocode/json"
         params = {
             "address": location,
             "key": GOOGLE_MAPS_API_KEY
@@ -28,7 +36,7 @@ def geocode_location(location):
 
 # ---------------- MAIN FUNCTION ----------------
 @st.cache_data(show_spinner=False)
-def get_polling_stations(location):
+def get_polling_stations(location, bias_lat=None, bias_lng=None):
     try:
         print(f"Fetching stations for: {location}")
 

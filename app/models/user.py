@@ -6,6 +6,7 @@ class User(BaseModel):
     # -------- CORE (UNCHANGED) --------
     age: int
     location: str
+    voting_location: Optional[str] = None
     is_registered: bool
 
     # -------- OPTIONAL (NEW) --------

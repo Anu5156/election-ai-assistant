@@ -8,3 +8,6 @@ folium
 gtts
 polyline
 python-dotenv
+plotly
+pandas
+google-genai
