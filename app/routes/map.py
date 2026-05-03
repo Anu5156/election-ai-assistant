@@ -1,6 +1,6 @@
 """
 Map Route - CivicGuide AI
-Handles the interactive polling booth map, routing, and crowd density visualization.
+Map Route v2.1 (Hardened)
 """
 
 import streamlit as st

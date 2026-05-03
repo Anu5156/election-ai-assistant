@@ -1,6 +1,6 @@
 """
 CivicGuide AI - Main Orchestration Module
-FAANG-Standard Architecture v3.0
+FAANG-Standard Architecture v3.1 (Force Cache Clear)
 """
 
 import streamlit as st
