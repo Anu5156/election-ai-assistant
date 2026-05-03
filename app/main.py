@@ -83,6 +83,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── GLOBAL CSS ──
+st.markdown('<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">', unsafe_allow_html=True)
 st.markdown(get_global_styles(), unsafe_allow_html=True)
 
 # ── SIDEBAR ──
