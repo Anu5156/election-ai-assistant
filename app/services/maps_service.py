@@ -1,3 +1,7 @@
+"""
+Maps Service - CivicGuide AI
+V2.1.0 - Hardened for Modular Architecture
+"""
 import requests
 from app.config import GOOGLE_MAPS_API_KEY
 import streamlit as st
